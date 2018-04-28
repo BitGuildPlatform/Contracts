@@ -1,12 +1,9 @@
 pragma solidity ^0.4.2;
 
+import "./PLATPriceOracle.sol";
 
 contract BitGuildToken {
   function transfer(address _to, uint256 _value) public;
-}
-
-contract PLATPriceOracle {
-  uint256 public PLATprice;
 }
 
 contract BitGuildTopUp {
