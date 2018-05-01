@@ -47,8 +47,15 @@ contract BitGuildTopUp {
     return tokens;
   }
 
-  // fallback function
+  // Fallback function
   function () external payable {
     buyTokens();
+  }
+  
+  // Retrieve locked tokens (for when this contract is not needed anymore)
+  function retrieveTokens() public {
+    require(msg.sender == wallet);
+    uint256 tokensLeft = token.balanceOf(this);
+    token.transfer(wallet, tokensLeft);
   }
 }
