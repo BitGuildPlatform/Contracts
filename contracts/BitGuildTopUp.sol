@@ -1,10 +1,7 @@
 pragma solidity ^0.4.20;
 
 import "./PLATPriceOracle.sol";
-
-contract BitGuildToken {
-  function transfer(address _to, uint256 _value) public;
-}
+import "./BitGuildToken.sol";
 
 contract BitGuildTopUp {
   // Token contract
@@ -51,7 +48,7 @@ contract BitGuildTopUp {
   function () external payable {
     buyTokens();
   }
-  
+
   // Retrieve locked tokens (for when this contract is not needed anymore)
   function retrieveTokens() public {
     require(msg.sender == wallet);
