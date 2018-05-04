@@ -43,7 +43,7 @@ contract BitGuildTopUp {
 
   // Returns you how much tokens do you get for the wei passed
   function getTokenAmount(uint256 weiAmount, uint256 price) internal pure returns (uint256) {
-    uint256 tokens = weiAmount.mul(1000000000000000000).div(price);
+    uint256 tokens = weiAmount.mul(1 ether).div(price);
     return tokens;
   }
 
