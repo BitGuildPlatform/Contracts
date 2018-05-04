@@ -1,9 +1,12 @@
 pragma solidity ^0.4.20;
 
+import "./SafeMath.sol";
 import "./PLATPriceOracle.sol";
 import "./BitGuildToken.sol";
 
 contract BitGuildTopUp {
+  using SafeMath for uint256;
+
   // Token contract
   BitGuildToken public token;
 
@@ -40,7 +43,7 @@ contract BitGuildTopUp {
 
   // Returns you how much tokens do you get for the wei passed
   function getTokenAmount(uint256 weiAmount, uint256 price) internal pure returns (uint256) {
-    uint256 tokens = weiAmount * 1000000000000000000 / price;
+    uint256 tokens = weiAmount.mul(1000000000000000000).div(price);
     return tokens;
   }
 
