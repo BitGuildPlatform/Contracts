@@ -1,13 +1,7 @@
-pragma solidity ^0.4.2;
+pragma solidity ^0.4.20;
 
-
-contract BitGuildToken {
-  function transfer(address _to, uint256 _value) public;
-}
-
-contract PLATPriceOracle {
-  uint256 public PLATprice;
-}
+import "./PLATPriceOracle.sol";
+import "./BitGuildToken.sol";
 
 contract BitGuildTopUp {
   // Token contract
@@ -50,8 +44,15 @@ contract BitGuildTopUp {
     return tokens;
   }
 
-  // fallback function
+  // Fallback function
   function () external payable {
     buyTokens();
+  }
+
+  // Retrieve locked tokens (for when this contract is not needed anymore)
+  function retrieveTokens() public {
+    require(msg.sender == wallet);
+    uint256 tokensLeft = token.balanceOf(this);
+    token.transfer(wallet, tokensLeft);
   }
 }
