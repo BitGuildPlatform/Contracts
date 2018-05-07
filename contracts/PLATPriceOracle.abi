@@ -1,17 +1,15 @@
 [
 	{
-		"constant": true,
-		"inputs": [],
-		"name": "PLATprice",
-		"outputs": [
+		"anonymous": false,
+		"inputs": [
 			{
-				"name": "",
+				"indexed": false,
+				"name": "newPrice",
 				"type": "uint256"
 			}
 		],
-		"payable": false,
-		"stateMutability": "view",
-		"type": "function"
+		"name": "PriceChanged",
+		"type": "event"
 	},
 	{
 		"constant": false,
@@ -32,6 +30,12 @@
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
 		"constant": false,
 		"inputs": [
 			{
@@ -46,21 +50,17 @@
 		"type": "function"
 	},
 	{
+		"constant": true,
 		"inputs": [],
-		"payable": false,
-		"stateMutability": "nonpayable",
-		"type": "constructor"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
+		"name": "ETHPrice",
+		"outputs": [
 			{
-				"indexed": false,
-				"name": "newPrice",
+				"name": "",
 				"type": "uint256"
 			}
 		],
-		"name": "PLATPriceChanged",
-		"type": "event"
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
 	}
 ]
