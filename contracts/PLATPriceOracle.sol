@@ -4,11 +4,10 @@ contract PLATPriceOracle {
 
   mapping (address => bool) admins;
 
-  // How much Eth you get for 1 PLAT, multiplied by 10^18
-  // Default value is the ICO price, make sure you update
-  uint256 public PLATprice = 12500000000000;
+  // How much PLAT you get for 1 ETH, multiplied by 10^18
+  uint256 public ETHPrice = 60000000000000000000000;
 
-  event PLATPriceChanged(uint256 newPrice);
+  event PriceChanged(uint256 newPrice);
 
   constructor() public {
     admins[msg.sender] = true;
@@ -17,8 +16,8 @@ contract PLATPriceOracle {
   function updatePrice(uint256 _newPrice) public {
     require(_newPrice > 0);
     require(admins[msg.sender] == true);
-    PLATprice = _newPrice;
-    emit PLATPriceChanged(_newPrice);
+    ETHPrice = _newPrice;
+    emit PriceChanged(_newPrice);
   }
 
   function setAdmin(address _newAdmin, bool _value) public {
