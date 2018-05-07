@@ -31,7 +31,7 @@ contract BitGuildTopUp {
   // low level token purchase function
   function buyTokens() public payable {
     // calculate token amount to be created
-    uint256 tokens = getTokenAmount(msg.value, oracle.PLATprice());
+    uint256 tokens = getTokenAmount(msg.value, oracle.ETHPrice());
 
     // Send tokens
     token.transfer(msg.sender, tokens);
@@ -43,7 +43,7 @@ contract BitGuildTopUp {
 
   // Returns you how much tokens do you get for the wei passed
   function getTokenAmount(uint256 weiAmount, uint256 price) internal pure returns (uint256) {
-    uint256 tokens = weiAmount.mul(1 ether).div(price);
+    uint256 tokens = weiAmount.mul(price).div(1 ether);
     return tokens;
   }
 
