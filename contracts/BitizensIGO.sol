@@ -31,19 +31,19 @@ contract BitizensIGO is Ownable {
         setIdToPrice[17] = 60000 * 1e18;       //  0.5 Eth
         setIdToPrice[18] = 480000 * 1e18;      //  8.0 Eth
         setIdToPrice[19] = 3000000 * 1e18;     // 50.0 Eth
-        setIdToPrice[999] = 720000 * 1e18;     // 12.0 Eth
+        setIdToPrice[20] = 720000 * 1e18;      // 12.0 Eth
 
         setIdToQty[16] = 25;
         setIdToQty[17] = 100;
         setIdToQty[18] = 10;
         setIdToQty[19] = 1;
-        setIdToQty[999] = 3;
+        setIdToQty[20] = 3;
 
         setIdToSerial[16] = 1;
         setIdToSerial[17] = 1;
         setIdToSerial[18] = 1;
         setIdToSerial[19] = 1;
-        setIdToSerial[999] = 1;
+        setIdToSerial[20] = 1;
     }
 
     /// @dev fall back function
@@ -123,7 +123,7 @@ contract BitizensIGO is Ownable {
         setIdToQty[17] = 0;
         setIdToQty[18] = 0;
         setIdToQty[19] = 0;
-        setIdToQty[999] = 0;
+        setIdToQty[20] = 0;
     }
 
     /// @dev helper function to convert bytes back to uint256
