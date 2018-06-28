@@ -15,7 +15,7 @@ contract BitizensIGO is Ownable {
     event TicketSold(address _buyer, uint _setId, uint _serial);
 
     // Predefined PLAT token
-    BitGuildToken public token;
+    BitGuildToken public token = BitGuildToken(0x7E43581b19ab509BCF9397a2eFd1ab10233f27dE);
 
     // Discount for gas price in PLAT
     uint public discount = 50 * 1e18;
@@ -77,7 +77,7 @@ contract BitizensIGO is Ownable {
     function receiveApproval(address _sender, uint256 _value, BitGuildToken _tokenContract, bytes _extraData) public {
         /// @dev Make sure approveAndCall comes from the official BitGuildToken contract
         require(
-            msg.sender == 0x7E43581b19ab509BCF9397a2eFd1ab10233f27dE,
+            msg.sender == address(token),
             "Unauthorized contract address."
         );
 
