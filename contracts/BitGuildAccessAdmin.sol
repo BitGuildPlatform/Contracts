@@ -13,7 +13,6 @@ contract BitGuildAccessAdmin {
 
     mapping(address => bool) public isOperator;
 
-    event OwnershipRenounced(address indexed previousOwner);
     event OwnershipTransferred(
         address indexed previousOwner,
         address indexed newOwner
