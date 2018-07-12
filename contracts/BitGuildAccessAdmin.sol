@@ -11,7 +11,7 @@ contract BitGuildAccessAdmin {
     address public owner;
     address[] public operators;
 
-    uint public MAX = 10; // Default maximum number of operators allowed
+    uint public MAX_OPS = 10; // Default maximum number of operators allowed
 
     mapping(address => bool) public isOperator;
 
@@ -33,13 +33,8 @@ contract BitGuildAccessAdmin {
         _;
     }
 
-    /// @dev Throws if called by any non-operator account.
+    /// @dev Throws if called by any non-operator account. Owner has all ops rights.
     modifier onlyOperator() {
-        require(isOperator[msg.sender]);
-        _;
-    }
-
-    modifier onlyOwnerOrOperator() {
         require(
             isOperator[msg.sender] || msg.sender == owner,
             "Permission denied. Must be an operator or the owner."
@@ -64,7 +59,7 @@ contract BitGuildAccessAdmin {
      * @dev Allows the current owner or operators to add operators
      * @param _newOperator New operator address
      */
-    function addOperator(address _newOperator) public onlyOwnerOrOperator {
+    function addOperator(address _newOperator) public onlyOperator {
         require(
             _newOperator != address(0),
             "Invalid new operator address."
@@ -78,7 +73,7 @@ contract BitGuildAccessAdmin {
 
         // Only allow so many ops
         require(
-            operators.length < MAX,
+            operators.length < MAX_OPS,
             "Overflow."
         );
 
@@ -92,7 +87,7 @@ contract BitGuildAccessAdmin {
      * @dev Allows the current owner or operators to remove operator
      * @param _operator Address of the operator to be removed
      */
-    function removeOperator(address _operator) public onlyOwnerOrOperator {
+    function removeOperator(address _operator) public onlyOperator {
         // Make sure operators array is not empty
         require(
             operators.length > 0,
@@ -134,7 +129,7 @@ contract BitGuildAccessAdmin {
     }
 
     /// @dev Return all operator addresses
-    function getAllOps() public onlyOwnerOrOperator view returns(address []) {
+    function getAllOps() public onlyOperator view returns(address []) {
         return operators;
     }
 
@@ -147,6 +142,6 @@ contract BitGuildAccessAdmin {
             _newMax > 0 && _newMax < 1000,
             "Allowed max is between 1 and 999."
         );
-        MAX = _newMax;
+        MAX_OPS = _newMax;
     }
 }
