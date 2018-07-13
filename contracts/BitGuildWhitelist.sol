@@ -8,14 +8,12 @@ import "./BitGuildAccessAdmin.sol";
  * @dev A small smart contract to provide whitelist functionality and storage
  */
 contract BitGuildWhitelist is BitGuildAccessAdmin {
-    address[] public whitelist;
-
     mapping (address => bool) public isWhitelisted;
 
     event AddressWhitelisted(address indexed addr, address operator);
     event AddressRemovedFromWhitelist(address indexed addr, address operator);
 
-    /// @dev Throws if _address is not in whitelist.
+    // @dev Throws if _address is not in whitelist.
     modifier onlyWhitelisted(address _address) {
         require(
             isWhitelisted[_address],
@@ -45,9 +43,7 @@ contract BitGuildWhitelist is BitGuildAccessAdmin {
             "Address is already whitelisted."
         );
 
-        whitelist.push(_newAddr);
         isWhitelisted[_newAddr] = true;
-
         emit AddressWhitelisted(_newAddr, msg.sender);
     }
 
@@ -66,17 +62,6 @@ contract BitGuildWhitelist is BitGuildAccessAdmin {
             isWhitelisted[_addr],
             "Address not in whitelist."
         );
-
-        // Manual array manipulation:
-        // - replace the _operator with last operator in array
-        // - remove the last item from array
-        address lastAddress = whitelist[whitelist.length - 1];
-        for (uint i = 0; i < whitelist.length; i++) {
-            if (whitelist[i] == _addr) {
-                whitelist[i] = lastAddress;
-            }
-        }
-        whitelist.length -= 1; // remove the last element
 
         isWhitelisted[_addr] = false;
         emit AddressRemovedFromWhitelist(_addr, msg.sender);
@@ -97,15 +82,5 @@ contract BitGuildWhitelist is BitGuildAccessAdmin {
                 removeFromWhitelist(addr);
             }
         }
-    }
-
-    /// @dev Get number of addresses in the whitelist
-    function whitelistCount() public view returns(uint count) {
-        return whitelist.length;
-    }
-
-    /// @dev Return all whitelisted addresses
-    function getWhitelist() public onlyOperator view returns(address []) {
-        return whitelist;
     }
 }

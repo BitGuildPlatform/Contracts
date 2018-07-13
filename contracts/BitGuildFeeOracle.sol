@@ -8,7 +8,7 @@ import "./BitGuildAccessAdmin.sol";
  * @dev Fee definition
  */
 contract BitGuildFeeOracle is BitGuildAccessAdmin {
-    /// @dev fixed is not supported. use percent * 100
+    // @dev fixed is not supported. use percent * 100 to include 2 decimals
     uint public percentFee = 300; // Fees bitguild marketplace charges.
 
     event FeeChanged(uint newPercentFee, uint oldPercentFee, address operator);
@@ -37,12 +37,12 @@ contract BitGuildFeeOracle is BitGuildAccessAdmin {
             "Invalid price."
         );
 
-        fee = safeMul(_price, percentFee) / 10000; // adjust for percent and decimal. division always truncate
+        fee = _safeMul(_price, percentFee) / 10000; // adjust for percent and decimal. division always truncate
         return fee;
     }
 
     // safe multiplication
-    function safeMul(uint a, uint b) internal pure returns (uint) {
+    function _safeMul(uint a, uint b) internal pure returns (uint) {
         if (a == 0) {
             return 0;
         }

@@ -11,7 +11,7 @@ contract BitGuildAccessAdmin {
     address public owner;
     address[] public operators;
 
-    uint public MAX_OPS = 10; // Default maximum number of operators allowed
+    uint public MAX_OPS = 20; // Default maximum number of operators allowed
 
     mapping(address => bool) public isOperator;
 
@@ -22,18 +22,18 @@ contract BitGuildAccessAdmin {
     event OperatorAdded(address operator);
     event OperatorRemoved(address operator);
 
-    /// @dev The BitGuildAccessAdmin constructor: sets owner to the sender account
+    // @dev The BitGuildAccessAdmin constructor: sets owner to the sender account
     constructor() public {
         owner = msg.sender;
     }
 
-    /// @dev Throws if called by any account other than the owner.
+    // @dev Throws if called by any account other than the owner.
     modifier onlyOwner() {
         require(msg.sender == owner);
         _;
     }
 
-    /// @dev Throws if called by any non-operator account. Owner has all ops rights.
+    // @dev Throws if called by any non-operator account. Owner has all ops rights.
     modifier onlyOperator() {
         require(
             isOperator[msg.sender] || msg.sender == owner,
@@ -59,7 +59,7 @@ contract BitGuildAccessAdmin {
      * @dev Allows the current owner or operators to add operators
      * @param _newOperator New operator address
      */
-    function addOperator(address _newOperator) public onlyOperator {
+    function addOperator(address _newOperator) public onlyOwner {
         require(
             _newOperator != address(0),
             "Invalid new operator address."
@@ -87,7 +87,7 @@ contract BitGuildAccessAdmin {
      * @dev Allows the current owner or operators to remove operator
      * @param _operator Address of the operator to be removed
      */
-    function removeOperator(address _operator) public onlyOperator {
+    function removeOperator(address _operator) public onlyOwner {
         // Make sure operators array is not empty
         require(
             operators.length > 0,
@@ -115,33 +115,11 @@ contract BitGuildAccessAdmin {
         emit OperatorRemoved(_operator);
     }
 
-    /// @dev Remove ALL operators
+    // @dev Remove ALL operators
     function removeAllOps() public onlyOwner {
         for (uint i = 0; i < operators.length; i++) {
             isOperator[operators[i]] = false;
         }
         operators.length = 0;
-    }
-
-    /// @dev Get number of operators
-    function opsCount() public view returns(uint count) {
-        return operators.length;
-    }
-
-    /// @dev Return all operator addresses
-    function getAllOps() public onlyOperator view returns(address []) {
-        return operators;
-    }
-
-    /**
-     * @dev Update maximum allowed operators
-     * @param _newMax new maximum number of operators
-     */
-    function updateMax(uint _newMax) public onlyOwner {
-        require(
-            _newMax > 0 && _newMax < 1000,
-            "Allowed max is between 1 and 999."
-        );
-        MAX_OPS = _newMax;
     }
 }
