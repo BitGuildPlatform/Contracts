@@ -3,7 +3,7 @@ pragma solidity ^0.4.22;
 import "./BitGuildToken.sol";
 import "./BitGuildAccessAdmin.sol";
 import "./BitGuildWhitelist.sol";
-import "./BitGuildFeeOracle.sol";
+import "./BitGuildFeeProvider.sol";
 import "./SafeMath.sol";
 import "./ERC721.sol";
 import "./Seriality.sol";
@@ -30,34 +30,43 @@ contract BitGuildMarketplace is BitGuildAccessAdmin, Seriality {
     bytes4 constant ERC721_RECEIVED = 0x150b7a02;
 
     // BitGuild Contracts
-    // BitGuildToken public token = BitGuildToken(0x7E43581b19ab509BCF9397a2eFd1ab10233f27dE); // Main Net
-    // BitGuildWhitelist public whitelist = BitGuildWhitelist(); // Main Net
+    // BitGuildToken public PLAT = BitGuildToken(0x7E43581b19ab509BCF9397a2eFd1ab10233f27dE); // Main Net
+    // BitGuildWhitelist public Whitelist = BitGuildWhitelist(); // Main Net
+    // BitGuildFeeProvide public FeeProvider = BitGuildFeeProvider(); // Main Net
     BitGuildToken public PLAT = BitGuildToken(0x0F2698b7605fE937933538387b3d6Fec9211477d); // Rinkeby
     BitGuildWhitelist public Whitelist = BitGuildWhitelist(0x72b93A4943eF4f658648e27D64e9e3B8cDF520a6); // Rinkeby
+    BitGuildFeeProvider public FeeProvider = BitGuildFeeProvider(0x47831668C08d635037ABfc9CF2B75Bd7658C7633); // Rinkeby
 
     // TODO: add function to modify this length or move this to a separate contract
     uint public defaultExpiry = 7 days;   // default expiry 7 days
 
-    // TODO: add extend function
+    enum Currencies { PLAT, ETH }
     struct Listing {
-        address seller;     // seller address
-        uint pirce;         // Big number in ETH or PLAT
-        uint currency;      // 0: ETH, 1: PLAT
-        uint createdAt;     // timestamp
-        uint expiry;        // createdAt + defaultExpiry
+        Currencies currency;    // ETH or PLAT
+        address seller;         // seller address
+        address token;          // token contract
+        uint tokenId;           // token id
+        uint price;             // Big number in ETH or PLAT
+        uint createdAt;         // timestamp
+        uint expiry;            // createdAt + defaultExpiry
     }
 
-    uint public numListings = 0;
-    mapping(uint => Listing) public listings;
-
-    mapping(address => mapping(uint => uint)) public listingIndex;
+    mapping(bytes32 => Listing) public listings;
 
     event LogListingCreated(
         address _seller,
         address _contract,
         uint _tokenId,
         uint _createdAt,
-        uint expiry
+        uint _expiry
+    );
+
+    event LogListingExtended(
+        address _seller,
+        address _contract,
+        uint _tokenId,
+        uint _createdAt,
+        uint _expiry
     );
 
     event LogItemSold(
@@ -66,7 +75,7 @@ contract BitGuildMarketplace is BitGuildAccessAdmin, Seriality {
         address _contract,
         uint _tokenId,
         uint _price,
-        uint _currency,
+        Currencies _currency,
         uint _soldAt
     );
 
@@ -140,6 +149,17 @@ contract BitGuildMarketplace is BitGuildAccessAdmin, Seriality {
     }
 
     // ===========================================
+    // Fee functions
+    // ===========================================
+    function getFee(uint _price) public view returns(uint percent, uint fee) {
+        (percent, fee) = FeeProvider.getFee(_price);
+    }
+
+    function getFee(uint _price, address _buyer, address _seller, address _token) public view returns(uint percent, uint fee) {
+        (percent, fee) = FeeProvider.getFee(_price, _buyer, _seller, _token);
+    }
+
+    // ===========================================
     // Seller Functions
     // ===========================================
 
@@ -165,14 +185,39 @@ contract BitGuildMarketplace is BitGuildAccessAdmin, Seriality {
     // @dev Withdraw item from marketplace back to seller
     // @param _contract whitelisted game contract
     // @param _tokenId  tokenId
-    function withdrawItem(address _contract, uint _tokenId) public returns(bool) {
-        uint index = listingIndex[_contract][_tokenId];
+    function extendItem(address _contract, uint _tokenId) public returns(bool) {
+        bytes32 hash = _getHashKey(_contract, _tokenId);
+        address seller = listings[hash].seller;
         require(
-            index > 0,
-            "Listing not found."
+            Whitelist.isWhitelisted(_contract),
+            "Contract not in whitelist."
         );
-        Listing memory listing = listings[index];
-        address seller = listing.seller;
+
+        require(
+            seller == msg.sender,
+            "Only seller can withdraw listing."
+        );
+
+        listings[hash].expiry += defaultExpiry;
+
+        emit LogListingExtended(
+            seller,
+            _contract,
+            _tokenId,
+            listings[hash].createdAt,
+            listings[hash].expiry
+        );
+
+        return true;
+    }
+
+    // @dev Withdraw item from marketplace back to seller
+    // @param _contract whitelisted game contract
+    // @param _tokenId  tokenId
+    function withdrawItem(address _contract, uint _tokenId) public returns(bool) {
+        // TODO: validate _contract and _tokenId?
+        bytes32 hash = _getHashKey(_contract, _tokenId);
+        address seller = listings[hash].seller;
 
         require(
             Whitelist.isWhitelisted(_contract),
@@ -191,8 +236,7 @@ contract BitGuildMarketplace is BitGuildAccessAdmin, Seriality {
         emit LogItemWithdrawn(seller, _contract, _tokenId, now);
 
         // remove listing
-        delete listings[index];
-        listingIndex[_contract][_tokenId] = 0;
+        _delist(hash);
 
         return true;
     }
@@ -233,52 +277,54 @@ contract BitGuildMarketplace is BitGuildAccessAdmin, Seriality {
     //     return true;
     // }
 
-    // // Buy with PLAT requires calling BitGuildToken contract, then redirect here
-    // function receiveApproval(address _sender, uint _value, bytes _extraData)
-    //     public
-    //     isPLAT
-    //     doPricesMatchPLAT(_itemId, _value)
-    //     returns(bool success)
-    // {
-    //     require(
-    //         _extraData.length != 0,
-    //         "No extraData provided."
-    //     );
+    // Buy with PLAT requires calling BitGuildToken contract, then redirect here
+    // _extraData: address _gameContract, uint _tokenId
+    function receiveApproval(address _buyer, uint _value, BitGuildToken _PLAT, bytes _extraData)
+        public
 
-    //     // TODO: handle fees
+        address token;
+        uint tokenId;
+        (token, tokenId) = _decodeBuyData(_extraData);
+        bytes32 hash = _getHashKey(token, tokenId);
+        address seller = listings[hash].seller;
+        uint price = listings[hash].price;
+        Currencies currency = listings[hash].currency;
 
-    //     // convert tokenId back to uint
-    //     uint _itemId = _bytesToUint(_extraData);
+        uint fee;
+        (,fee) = getFee(_value, _buyer, seller, token);
+        debugFee = fee;
 
-    //     // Check for valid item Id
-    //     _isValidItemId(_itemId);
+        // TODO: add validation back
+        // require(
+        //     Currencies(listings[hash].currency) == Currencies.PLAT,
+        //     "Must be purchased with PLAT."
+        // );
 
-    //     // Check if item is available
-    //     _isItemAvailable(_itemId);
+        // require(
+        //     price > 0 && price == _value,
+        //     "Invalid purchase price."
+        // );
 
-    //     // check if set has price and has correct price
-    //     require(
-    //         itemIdToPLAT[_itemId] == _value,
-    //         "Invalid PLAT price."
-    //     );
+        // require(
+        //     listings[hash].expiry > now,
+        //     "Item has expired."
+        // );
 
-    //     // Transfer item token to buyer
-    //     _safeTransferToken(_itemId);
+        // TODO: wrap require to all transfers
+        // Transfer PLAT to marketplace contract
+        _PLAT.transferFrom(_buyer, address(this), _value);
+        // Transfer item token to buyer
+        ERC721 gameToken = ERC721(token);
+        gameToken.safeTransferFrom(this, _buyer, tokenId);
+        // // Transfer Balance - Fee to seller
+        // _PLAT.transferFrom(address(this), seller, _value - fee);
 
-    //     // Transfer PLAT to service contract
-    //     require(
-    //         PLAT.transferFrom(_sender, address(this), _value),
-    //         "Approved PLAT transfer failed."
-    //     );
+        // delist item
+        _delist(hash);
 
-    //     // Update mappings
-    //     address seller = itemIdToSeller[_itemId];
-    //     itemIdToSeller[_itemId] = address(0);     // Mark item unavailable
-
-    //     // Emit event
-    //     emit ItemSold(_sender, seller, _itemId, 0, _value);
-    //     return true;
-    // }
+        // Emit event
+        emit LogItemSold(_buyer, seller, token, tokenId, _value, currency, now);
+    }
 
     // ===========================================
     // Admin Functions
@@ -297,60 +343,73 @@ contract BitGuildMarketplace is BitGuildAccessAdmin, Seriality {
     // ===========================================
     // Internal Functions
     // ===========================================
-    function _newListing(address _seller, address _contract, uint _tokenId, uint _price, uint _currency) internal returns(uint id) {
-        id = numListings++;
+    function _delist(bytes32 hash) internal {
+        // remove listing
+        listings[hash].currency = Currencies(0);
+        listings[hash].seller = address(0);
+        listings[hash].token = address(0);
+        listings[hash].tokenId = 0;
+        listings[hash].price = 0;
+        listings[hash].createdAt = 0;
+        listings[hash].expiry = 0;
+    }
+    function _getHashKey(address _contract, uint _tokenId) internal pure returns(bytes32 key) {
+        key = keccak256(abi.encodePacked(_contract, _tokenId));
+    }
+
+    function _newListing(address _seller, address _contract, uint _tokenId, uint _price, uint _currency) internal {
+        bytes32 hash = _getHashKey(_contract, _tokenId);
         uint createdAt = now;
         uint expiry = now + defaultExpiry;
-        listings[id] = Listing(_seller, _price, _currency, createdAt, expiry);
+        listings[hash].currency = Currencies(_currency);
+        listings[hash].seller = _seller;
+        listings[hash].token = _contract;
+        listings[hash].tokenId = _tokenId;
+        listings[hash].price = _price;
+        listings[hash].createdAt = createdAt;
+        listings[hash].expiry = expiry;
+
+        lastTx.currency = Currencies(_currency);
+        lastTx.seller = _seller;
+        lastTx.token = _contract;
+        lastTx.tokenId = _tokenId;
+        lastTx.price = _price;
+        lastTx.createdAt = createdAt;
+        lastTx.expiry = expiry;
 
         emit LogListingCreated(_seller, _contract, _tokenId, createdAt, expiry);
     }
 
     // @dev unpack _extraData and log info
     // @param _extraData packed bytes of (uint _price, uint _currency)
-    function _deposit(address _seller, address _contract, uint _tokenId, bytes _extraData) internal returns(uint newListingId) {
+    function _deposit(address _seller, address _contract, uint _tokenId, bytes _extraData) internal {
         require(
             Whitelist.isWhitelisted(_contract),
             "Contract not in whitelist."
         );
 
-        // Deserialize _extraData
-        uint256 offset = sizeOfUint(256) * 2;
-        uint256 price = bytesToUint256(offset, _extraData);
-        offset -= sizeOfUint(256);
-        uint256 currency = bytesToUint256(offset, _extraData);
+        uint price;
+        uint currency;
+        (currency, price) = _decodePriceData(_extraData);
 
-        newListingId = _newListing(_seller, _contract, _tokenId, price, currency);
+        _newListing(_seller, _contract, _tokenId, price, currency);
     }
-    // @dev transfer token from seller to this contract. all checks are done before calling this
-    // function _safeDeposit(address _from, uint _tokenId, bytes _extraData) private {
-    //     uint price = _bytesToUint(_extraData);
-    //     require(price > 0);                  // make sure price is valid
 
-    //     // Update mappings
-    //     itemIdToContract[currentItemId] = msg.sender;   // game contract
-    //     itemIdToSeller[currentItemId] = _from;     // 
-    //     itemIdToTokenId[currentItemId] = _tokenId;
-    //     uint createdAt = now;
-    //     uint expiry = createdAt + defaultExpiry;
-    //     itemIdToCreatedAt[currentItemId] = createdAt;
-    //     itemIdToPLAT[currentItemId] = price;
-    //     // Emit event
-    //     emit ItemDeposited(msg.sender, currentItemId, createdAt, expiry);
+    function _decodePriceData(bytes _extraData) internal pure returns(uint _currency, uint _price) {
+        // Deserialize _extraData
+        uint256 offset = 64;
+        _price = bytesToUint256(offset, _extraData);
+        offset -= sizeOfUint(256);
+        _currency = bytesToUint256(offset, _extraData);
+    }
 
-    //     // Update item count
-    //     currentItemId = currentItemId.add(1);
-    // }
-
-    // @dev safe transfer token to buyer. all checks are done before calling this.
-    // function _safeTransferToken(uint _itemId) private {
-    //     // Transfer item token to buyer
-    //     address _contract = itemIdToContract[_itemId];
-    //     uint _tokenId = itemIdToTokenId[_itemId];
-
-    //     ERC721 _ERC721contract = ERC721(_contract);
-    //     _ERC721contract.transferFrom(this, msg.sender, _tokenId);
-    // }
+    function _decodeBuyData(bytes _extraData) internal pure returns(address _contract, uint _tokenId) {
+        // Deserialize _extraData
+        uint256 offset = 64;
+        _tokenId = bytesToUint256(offset, _extraData);
+        offset -= sizeOfUint(256);
+        _contract = bytesToAddress(offset, _extraData);
+    }
 
     // function _isValidItemId(uint _itemId) private view {
     //     require(
@@ -374,14 +433,5 @@ contract BitGuildMarketplace is BitGuildAccessAdmin, Seriality {
     //         gameToken.ownerOf(_tokenId) == address(this),
     //         "Item is not on the exchange."
     //     );
-    // }
-
-    // @dev helper function to convert bytes back to uint256
-    // function _bytesToUint(bytes _b) private pure returns(uint256) {
-    //     uint256 number;
-    //     for (uint i=0; i < _b.length; i++) {
-    //         number = number + uint(_b[i]) * (2**(8 * (_b.length - (i+1))));
-    //     }
-    //     return number;
     // }
 }
