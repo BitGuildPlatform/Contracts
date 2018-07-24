@@ -292,7 +292,6 @@ contract BitGuildMarketplace is BitGuildAccessAdmin, Seriality {
 
         uint fee;
         (,fee) = getFee(_value, _buyer, seller, token);
-        debugFee = fee;
 
         // TODO: add validation back
         // require(
