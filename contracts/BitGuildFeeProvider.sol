@@ -42,10 +42,10 @@ contract BitGuildFeeProvider is BitGuildAccessAdmin {
      * @param _newFee New fee in percent x 100 (to support decimals)
      *                enter zero for default, 10000 for No Fee
      */
-    function updateCustomFee(uint _newFee, address _buyer, address _seller, address _token) public onlyOperator {
+    function updateCustomFee(uint _newFee, address _currency, address _buyer, address _seller, address _token) public onlyOperator {
         require(_newFee >= 0 && _newFee <= 10000, "Invalid percent fee.");
 
-        bytes32 key = _getHash(_buyer, _seller, _token);
+        bytes32 key = _getHash(_currency, _buyer, _seller, _token);
         uint oldPercentFee = customFee[key];
         customFee[key] = _newFee;
 
@@ -55,18 +55,10 @@ contract BitGuildFeeProvider is BitGuildAccessAdmin {
     /**
      * @dev Calculate the custom fee based on buyer, seller, game token or combo of these
      */
-    function getFee(uint _price, address _buyer, address _seller, address _token) public view returns(uint percent, uint fee) {
-        bytes32 key = _getHash(_buyer, _seller, _token);
+    function getFee(uint _price, address _currency, address _buyer, address _seller, address _token) public view returns(uint percent, uint fee) {
+        bytes32 key = _getHash(_currency, _buyer, _seller, _token);
         uint customPercentFee = customFee[key];
         (percent, fee) = _getFee(_price, customPercentFee);
-    }
-
-    /**
-     * @dev Return the default fee
-     * @param _price for calculating fee
-     */
-    function getFee(uint _price) public view returns(uint percent, uint fee) {
-        (percent, fee) = _getFee(_price, defaultPercentFee);
     }
 
     function _getFee(uint _price, uint _percentFee) internal view returns(uint percent, uint fee) {
@@ -89,8 +81,8 @@ contract BitGuildFeeProvider is BitGuildAccessAdmin {
     }
 
     // get custom fee hash
-    function _getHash(address _buyer, address _seller, address _token) internal pure returns(bytes32 key) {
-        key = keccak256(abi.encodePacked(_buyer, _seller, _token));
+    function _getHash(address _currency, address _buyer, address _seller, address _token) internal pure returns(bytes32 key) {
+        key = keccak256(abi.encodePacked(_currency, _buyer, _seller, _token));
     }
 
     // safe multiplication

@@ -34,14 +34,13 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
     // BitGuildFeeProvide public FeeProvider = BitGuildFeeProvider(); // Main Net
     BitGuildToken public PLAT = BitGuildToken(0x0F2698b7605fE937933538387b3d6Fec9211477d); // Rinkeby
     BitGuildWhitelist public Whitelist = BitGuildWhitelist(0x72b93A4943eF4f658648e27D64e9e3B8cDF520a6); // Rinkeby
-    BitGuildFeeProvider public FeeProvider = BitGuildFeeProvider(0x9bE88C776299795A4996D351215274F3f1d84100); // Rinkeby
+    BitGuildFeeProvider public FeeProvider = BitGuildFeeProvider(0xf7AB04A47AA9F3c8Cb7FDD701CF6DC6F2eB330E2); // Rinkeby
 
     uint public defaultExpiry = 7 days;             // default expiry is 7 days
-    bool public allowWithdrawBeforeExpiry = false;  // allow withdraw listing before expiry? default is false
 
-    enum Currencies { PLAT, ETH }
+    enum Currency { PLAT, ETH }
     struct Listing {
-        Currencies currency;    // ETH or PLAT
+        Currency currency;    // ETH or PLAT
         address seller;         // seller address
         address token;          // token contract
         uint tokenId;           // token id
@@ -54,7 +53,7 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
 
     event LogListingCreated(address _seller, address _contract, uint _tokenId, uint _createdAt, uint _expiry);
     event LogListingExtended(address _seller, address _contract, uint _tokenId, uint _createdAt, uint _expiry);
-    event LogItemSold(address _buyer, address _seller, address _contract, uint _tokenId, uint _price, Currencies _currency, uint _soldAt);
+    event LogItemSold(address _buyer, address _seller, address _contract, uint _tokenId, uint _price, Currency _currency, uint _soldAt);
     event LogItemWithdrawn(address _seller, address _contract, uint _tokenId, uint _withdrawnAt);
     event LogItemExtended(address _contract, uint _tokenId, uint _modifiedAt, uint _expiry);
 
@@ -76,14 +75,9 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
     // ===========================================
     // Fee functions (from fee provider contract)
     // ===========================================
-    // @dev get default fee
-    function getFee(uint _price) public view returns(uint percent, uint fee) {
-        (percent, fee) = FeeProvider.getFee(_price);
-    }
-
-    // @dev get custom fees
-    function getFee(uint _price, address _buyer, address _seller, address _token) public view returns(uint percent, uint fee) {
-        (percent, fee) = FeeProvider.getFee(_price, _buyer, _seller, _token);
+    // @dev get fees
+    function getFee(uint _price, address _currency, address _buyer, address _seller, address _token) public view returns(uint percent, uint fee) {
+        (percent, fee) = FeeProvider.getFee(_price, _currency, _buyer, _seller, _token);
     }
 
     // ===========================================
@@ -128,10 +122,6 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
 
         require(seller == msg.sender, "Only seller can withdraw listing.");
 
-        if (!allowWithdrawBeforeExpiry) {
-            require(listings[key].expiry <= now, "Withdraw only available after expired.");
-        }
-
         // Transfer item back to the seller
         ERC721 gameToken = ERC721(_contract);
         gameToken.safeTransferFrom(this, seller, _tokenId);
@@ -139,41 +129,17 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
         emit LogItemWithdrawn(seller, _contract, _tokenId, now);
 
         // remove listing
-        _delist(key);
+        delete(listings[key]);
     }
 
     // ===========================================
     // Purchase Item
     // ===========================================
     // @dev Buy item with ETH. Take ETH from buyer, transfer token, transfer payment minus fee to seller
-    // @param _contract  Token contract
+    // @param _token  Token contract
     // @param _tokenId   Token Id
-    function buyWithETH(address _contract, uint _tokenId) public onlyWhitelisted(_contract) payable {
-        bytes32 key = _getHashKey(_contract, _tokenId);
-        uint price = listings[key].price;
-        address seller = listings[key].seller;
-        Currencies currency = listings[key].currency;
-
-        require(currency == Currencies.ETH, "Listing not in ETH.");
-        require(msg.value > 0 && msg.value == price, "Invalid price.");
-        require(listings[key].expiry > now, "Item expired.");
-
-        ERC721 gameToken = ERC721(_contract);
-        require(gameToken.ownerOf(_tokenId) == address(this), "Item is not available.");
-
-        uint fee;
-        (,fee) = getFee(price, msg.sender, seller, _contract); // getFee returns percentFee and fee, we only need fee
-
-        // Transfer item token to buyer
-        gameToken.safeTransferFrom(this, msg.sender, _tokenId);
-        // Transfer Balance - fee to Seller
-        require(seller.send(price - fee) == true, "Transfer to seller failed.");
-
-        // delist item
-        _delist(key);
-
-        // Emit event
-        emit LogItemSold(msg.sender, seller, _contract, _tokenId, price, currency, now);
+    function buyWithETH(address _token, uint _tokenId) public onlyWhitelisted(_token) payable {
+        _buy(_token, _tokenId, Currency.ETH, msg.value, msg.sender);
     }
 
     // Buy with PLAT requires calling BitGuildToken contract, this is the callback
@@ -184,47 +150,19 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
     // @param _extraData address _gameContract, uint _tokenId
     function receiveApproval(address _buyer, uint _value, BitGuildToken _PLAT, bytes _extraData) public {
         require(_extraData.length > 0, "No extraData provided.");
+        // We check msg.sender with our known PLAT address instead of the _PLAT param
         require(msg.sender == address(PLAT), "Unauthorized PLAT contract address.");
 
         address token;
         uint tokenId;
         (token, tokenId) = _decodeBuyData(_extraData);
-        bytes32 key = _getHashKey(token, tokenId);
-        address seller = listings[key].seller;
 
-        require(listings[key].currency == Currencies.PLAT, "Listing not in PLAT.");
-        require(_value > 0 && _value == listings[key].price, "Invalid price.");
-        require(listings[key].expiry > now, "Item expired.");
-
-        ERC721 gameToken = ERC721(token);
-        require(gameToken.ownerOf(tokenId) == address(this), "Item is not available.");
-
-        uint fee;
-        (,fee) = getFee(_value, _buyer, seller, token); // getFee returns percentFee and fee, we only need fee
-
-
-        // Transfer PLAT to marketplace contract
-        require(_PLAT.transferFrom(_buyer, address(this), _value), "PLAT payment transfer failed.");
-        // Transfer item token to buyer
-        gameToken.safeTransferFrom(this, _buyer, tokenId);
-        // Transfer Balance - fee to Seller
-        _PLAT.transfer(seller, _value - fee);
-
-        // delist item
-        _delist(key);
-
-        // Emit event
-        emit LogItemSold(_buyer, seller, token, tokenId, _value, listings[key].currency, now);
+        _buy(token, tokenId, Currency.PLAT, _value, _buyer);
     }
 
     // ===========================================
     // Admin Functions
     // ===========================================
-    // @dev Update fee provider contract
-    function updateAllowWithdrawBeforeExpiry(bool _allow) public onlyOperator {
-        allowWithdrawBeforeExpiry = _allow;
-    }
-
     // @dev Update fee provider contract
     function updateFeeProvider(address _newAddr) public onlyOperator {
         require(_newAddr != address(0), "Invalid contract address.");
@@ -245,7 +183,7 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
 
     // @dev Admin function: withdraw ETH balance
     function withdrawETH() public onlyOwner payable {
-        address(this).transfer(msg.value);
+        msg.sender.transfer(msg.value);
     }
 
     // @dev Admin function: withdraw PLAT balance
@@ -257,24 +195,12 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
     // ===========================================
     // Internal Functions
     // ===========================================
-    // @dev clear listing for hash key
-    function _delist(bytes32 _key) internal {
-        // remove listing
-        listings[_key].currency = Currencies(0);
-        listings[_key].seller = address(0);
-        listings[_key].token = address(0);
-        listings[_key].tokenId = 0;
-        listings[_key].price = 0;
-        listings[_key].createdAt = 0;
-        listings[_key].expiry = 0;
-    }
-
     function _getHashKey(address _contract, uint _tokenId) internal pure returns(bytes32 key) {
         key = keccak256(abi.encodePacked(_contract, _tokenId));
     }
 
     // @dev create new listing data
-    function _newListing(address _seller, address _contract, uint _tokenId, uint _price, Currencies _currency) internal {
+    function _newListing(address _seller, address _contract, uint _tokenId, uint _price, Currency _currency) internal {
         bytes32 key = _getHashKey(_contract, _tokenId);
         uint createdAt = now;
         uint expiry = now + defaultExpiry;
@@ -289,17 +215,56 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
         emit LogListingCreated(_seller, _contract, _tokenId, createdAt, expiry);
     }
 
-    // @dev unpack _extraData and log info
+    // @dev deposit unpacks _extraData and log listing info
     // @param _extraData packed bytes of (uint _price, uint _currency)
     function _deposit(address _seller, address _contract, uint _tokenId, bytes _extraData) internal onlyWhitelisted(_contract) {
         uint price;
         uint currencyUint;
         (currencyUint, price) = _decodePriceData(_extraData);
-        Currencies currency = Currencies(currencyUint);
+        Currency currency = Currency(currencyUint);
 
         require(price > 0, "Invalid price.");
 
         _newListing(_seller, _contract, _tokenId, price, currency);
+    }
+
+    // @dev handles purchase logic for both PLAT and ETH
+    function _buy(address _token, uint _tokenId, Currency _currency, uint _price, address _buyer) internal {
+        bytes32 key = _getHashKey(_token, _tokenId);
+        Currency currency = listings[key].currency;
+        address seller = listings[key].seller;
+
+        address currencyAddress = _currency == Currency.PLAT ? address(PLAT) : address(0);
+
+        require(currency == _currency, "Wrong currency.");
+        require(_price > 0 && _price == listings[key].price, "Invalid price.");
+        require(listings[key].expiry > now, "Item expired.");
+
+        ERC721 gameToken = ERC721(_token);
+        require(gameToken.ownerOf(_tokenId) == address(this), "Item is not available.");
+
+        if (_currency == Currency.PLAT) {
+            // Transfer PLAT to marketplace contract
+            require(PLAT.transferFrom(_buyer, address(this), _price), "PLAT payment transfer failed.");
+        }
+
+        // Transfer item token to buyer
+        gameToken.safeTransferFrom(this, _buyer, _tokenId);
+
+        uint fee;
+        (,fee) = getFee(_price, currencyAddress, _buyer, seller, _token); // getFee returns percentFee and fee, we only need fee
+
+        if (_currency == Currency.PLAT) {
+            PLAT.transfer(seller, _price - fee);
+        } else {
+            require(seller.send(_price - fee) == true, "Transfer to seller failed.");
+        }
+
+        // Emit event
+        emit LogItemSold(_buyer, seller, _token, _tokenId, _price, currency, now);
+
+        // delist item
+        delete(listings[key]);
     }
 
     function _decodePriceData(bytes _extraData) internal pure returns(uint _currency, uint _price) {
