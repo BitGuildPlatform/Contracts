@@ -29,18 +29,18 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
     bytes4 constant ERC721_RECEIVED = 0x150b7a02;
 
     // BitGuild Contracts
-    // BitGuildToken public PLAT = BitGuildToken(0x7E43581b19ab509BCF9397a2eFd1ab10233f27dE); // Main Net
-    // BitGuildWhitelist public Whitelist = BitGuildWhitelist(); // Main Net
-    // BitGuildFeeProvide public FeeProvider = BitGuildFeeProvider(); // Main Net
-    BitGuildToken public PLAT = BitGuildToken(0x0F2698b7605fE937933538387b3d6Fec9211477d); // Rinkeby
-    BitGuildWhitelist public Whitelist = BitGuildWhitelist(0x72b93A4943eF4f658648e27D64e9e3B8cDF520a6); // Rinkeby
-    BitGuildFeeProvider public FeeProvider = BitGuildFeeProvider(0xf7AB04A47AA9F3c8Cb7FDD701CF6DC6F2eB330E2); // Rinkeby
+    BitGuildToken public PLAT = BitGuildToken(0x7E43581b19ab509BCF9397a2eFd1ab10233f27dE); // Main Net
+    BitGuildWhitelist public Whitelist = BitGuildWhitelist(0xA8CedD578fed14f07C3737bF42AD6f04FAAE3978); // Main Net
+    BitGuildFeeProvider public FeeProvider = BitGuildFeeProvider(0x58D36571250D91eF5CE90869E66Cd553785364a2); // Main Net
+    // BitGuildToken public PLAT = BitGuildToken(0x0F2698b7605fE937933538387b3d6Fec9211477d); // Rinkeby
+    // BitGuildWhitelist public Whitelist = BitGuildWhitelist(0x72b93A4943eF4f658648e27D64e9e3B8cDF520a6); // Rinkeby
+    // BitGuildFeeProvider public FeeProvider = BitGuildFeeProvider(0xf7AB04A47AA9F3c8Cb7FDD701CF6DC6F2eB330E2); // Rinkeby
 
-    uint public defaultExpiry = 7 days;             // default expiry is 7 days
+    uint public defaultExpiry = 7 days;  // default expiry is 7 days
 
     enum Currency { PLAT, ETH }
     struct Listing {
-        Currency currency;    // ETH or PLAT
+        Currency currency;      // ETH or PLAT
         address seller;         // seller address
         address token;          // token contract
         uint tokenId;           // token id
