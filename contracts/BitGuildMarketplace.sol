@@ -4,7 +4,6 @@ import "./BitGuildToken.sol";
 import "./BitGuildAccessAdmin.sol";
 import "./BitGuildWhitelist.sol";
 import "./BitGuildFeeProvider.sol";
-import "./SafeMath.sol";
 import "./ERC721.sol";
 
 
@@ -20,8 +19,6 @@ interface ERC721TokenReceiver {
  * @dev: Marketplace smart contract for BitGuild.com
  */
 contract BitGuildMarketplace is BitGuildAccessAdmin {
-    using SafeMath for uint256;
-
     // Callback values from zepellin ERC721Receiver.sol
     // Old ver: bytes4(keccak256("onERC721Received(address,uint256,bytes)")) = 0xf0b9e5ba;
     bytes4 constant ERC721_RECEIVED_OLD = 0xf0b9e5ba;
