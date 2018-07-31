@@ -1,9 +1,9 @@
 pragma solidity ^0.4.24;
 
 
-import "./ERC998TopDownToken.sol";
+import "../lib/ERC998TopDownToken.sol";
 import "./AvatarChildService.sol";
-import "./UrlStr.sol";
+import "../lib/UrlStr.sol";
 import "./AvatarService.sol";
 
 contract AvatarToken is ERC998TopDownToken, AvatarService {

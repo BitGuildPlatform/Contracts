@@ -1,7 +1,7 @@
 pragma solidity ^0.4.24;
-import "./BitGuildAccessAdmin.sol";
+import "./Operator.sol";
 
-contract BitGuildAccessAdminExtend is BitGuildAccessAdmin {
+contract Pausable is Operator {
 
   event FrozenFunds(address target, bool frozen);
 

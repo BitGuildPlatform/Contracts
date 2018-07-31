@@ -1,9 +1,9 @@
 pragma solidity ^0.4.24;
 
-import "../lib/ERC721.sol";
-import "../lib/ERC721TokenReceiver.sol";
-import "../lib/SafeMath.sol";
-import "../shared/BitGuildAccessAdminExtend.sol";
+import "./ERC721.sol";
+import "./ERC721TokenReceiver.sol";
+import "./SafeMath.sol";
+import "./Pausable.sol";
 
 
 interface ERC998ERC721TopDown {
@@ -55,7 +55,7 @@ interface ERC20AndERC223 {
 }
 
 contract ComposableTopDown is ERC721, ERC998ERC721TopDown, ERC998ERC721TopDownEnumerable,
-                                     ERC998ERC20TopDown, ERC998ERC20TopDownEnumerable, BitGuildAccessAdminExtend{
+                                     ERC998ERC20TopDown, ERC998ERC20TopDownEnumerable, Pausable{
                             
   // tokenOwnerOf.selector;
   uint256 constant TOKEN_OWNER_OF = 0x89885a59;

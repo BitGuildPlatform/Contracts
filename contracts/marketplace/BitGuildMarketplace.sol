@@ -1,8 +1,8 @@
 pragma solidity ^0.4.22;
 
 import "../BitGuildToken.sol";
-import "../shared/BitGuildAccessAdmin.sol";
-import "../shared/BitGuildWhitelist.sol";
+import "../lib/Operator.sol";
+import "../lib/Whitelist.sol";
 import "./BitGuildFeeProvider.sol";
 import "../lib/ERC721.sol";
 
@@ -18,7 +18,7 @@ interface ERC721TokenReceiver {
  * @title BitGuildMarketplace
  * @dev: Marketplace smart contract for BitGuild.com
  */
-contract BitGuildMarketplace is BitGuildAccessAdmin {
+contract BitGuildMarketplace is Operator {
     // Callback values from zepellin ERC721Receiver.sol
     // Old ver: bytes4(keccak256("onERC721Received(address,uint256,bytes)")) = 0xf0b9e5ba;
     bytes4 constant ERC721_RECEIVED_OLD = 0xf0b9e5ba;
@@ -27,10 +27,10 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
 
     // BitGuild Contracts
     BitGuildToken public PLAT = BitGuildToken(0x7E43581b19ab509BCF9397a2eFd1ab10233f27dE); // Main Net
-    BitGuildWhitelist public Whitelist = BitGuildWhitelist(0xA8CedD578fed14f07C3737bF42AD6f04FAAE3978); // Main Net
+    Whitelist public BitGuildWhitelist = Whitelist(0xA8CedD578fed14f07C3737bF42AD6f04FAAE3978); // Main Net
     BitGuildFeeProvider public FeeProvider = BitGuildFeeProvider(0x58D36571250D91eF5CE90869E66Cd553785364a2); // Main Net
     // BitGuildToken public PLAT = BitGuildToken(0x0F2698b7605fE937933538387b3d6Fec9211477d); // Rinkeby
-    // BitGuildWhitelist public Whitelist = BitGuildWhitelist(0x72b93A4943eF4f658648e27D64e9e3B8cDF520a6); // Rinkeby
+    // Whitelist public BitGuildWhitelist = Whitelist(0x72b93A4943eF4f658648e27D64e9e3B8cDF520a6); // Rinkeby
     // BitGuildFeeProvider public FeeProvider = BitGuildFeeProvider(0xf7AB04A47AA9F3c8Cb7FDD701CF6DC6F2eB330E2); // Rinkeby
 
     uint public defaultExpiry = 7 days;  // default expiry is 7 days
@@ -55,7 +55,7 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
     event LogItemExtended(address _contract, uint _tokenId, uint _modifiedAt, uint _expiry);
 
     modifier onlyWhitelisted(address _contract) {
-        require(Whitelist.isWhitelisted(_contract), "Contract not in whitelist.");
+        require(BitGuildWhitelist.isWhitelisted(_contract), "Contract not in whitelist.");
         _;
     }
 
@@ -169,7 +169,7 @@ contract BitGuildMarketplace is BitGuildAccessAdmin {
     // @dev Update whitelist contract
     function updateWhitelist(address _newAddr) public onlyOperator {
         require(_newAddr != address(0), "Invalid contract address.");
-        Whitelist = BitGuildWhitelist(_newAddr);
+        BitGuildWhitelist = Whitelist(_newAddr);
     }
 
     // @dev Update expiry date

@@ -1,7 +1,5 @@
 pragma solidity ^0.4.24;
 
-import "../shared/BitGuildAccessAdmin.sol";
-
 interface AvatarService {
   function updateAvatarInfo(address _owner, uint256 _tokenId, string _name, uint256 _dna) external;
   function createAvatar(address _owner, string _name, uint256 _dna) external  returns(uint256);

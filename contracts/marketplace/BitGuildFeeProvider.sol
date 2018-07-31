@@ -1,13 +1,13 @@
 pragma solidity ^0.4.24;
 
-import "../shared/BitGuildAccessAdmin.sol";
+import "../lib/Operator.sol";
 
 
 /**
  * @title BitGuildFeeProvider
  * @dev Fee definition, supports custom fees by seller or buyer or token combinations
  */
-contract BitGuildFeeProvider is BitGuildAccessAdmin {
+contract BitGuildFeeProvider is Operator {
     // @dev Since default uint value is zero, need to distinguish Default vs No Fee
     uint constant NO_FEE = 10000;
 

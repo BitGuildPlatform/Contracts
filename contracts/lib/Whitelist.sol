@@ -1,13 +1,13 @@
 pragma solidity ^0.4.22;
 
-import "./BitGuildAccessAdmin.sol";
+import "./Operator.sol";
 
 
 /**
- * @title BitGuildWhitelist
+ * @title Whitelist
  * @dev A small smart contract to provide whitelist functionality and storage
  */
-contract BitGuildWhitelist is BitGuildAccessAdmin {
+contract Whitelist is Operator {
     uint public total = 0;
     mapping (address => bool) public isWhitelisted;
 

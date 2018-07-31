@@ -1,37 +1,22 @@
 pragma solidity ^0.4.24;
 
+import "./Ownable.sol";
 
 /**
- * @title BitGuildAccessAdmin
+ * @title Operator
  * @dev Allow two roles: 'owner' or 'operator'
  *      - owner: admin/superuser (e.g. with financial rights)
  *      - operator: can update configurations
  */
-contract BitGuildAccessAdmin {
-    address public owner;
+contract Operator is Ownable {
     address[] public operators;
 
     uint public MAX_OPS = 20; // Default maximum number of operators allowed
 
     mapping(address => bool) public isOperator;
 
-    event OwnershipTransferred(
-        address indexed previousOwner,
-        address indexed newOwner
-    );
     event OperatorAdded(address operator);
     event OperatorRemoved(address operator);
-
-    // @dev The BitGuildAccessAdmin constructor: sets owner to the sender account
-    constructor() public {
-        owner = msg.sender;
-    }
-
-    // @dev Throws if called by any account other than the owner.
-    modifier onlyOwner() {
-        require(msg.sender == owner);
-        _;
-    }
 
     // @dev Throws if called by any non-operator account. Owner has all ops rights.
     modifier onlyOperator() {
@@ -40,19 +25,6 @@ contract BitGuildAccessAdmin {
             "Permission denied. Must be an operator or the owner."
         );
         _;
-    }
-
-    /**
-     * @dev Allows the current owner to transfer control of the contract to a newOwner.
-     * @param _newOwner The address to transfer ownership to.
-     */
-    function transferOwnership(address _newOwner) public onlyOwner {
-        require(
-            _newOwner != address(0),
-            "Invalid new owner address."
-        );
-        emit OwnershipTransferred(owner, _newOwner);
-        owner = _newOwner;
     }
 
     /**
