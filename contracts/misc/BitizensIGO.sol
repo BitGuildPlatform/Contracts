@@ -1,8 +1,8 @@
 pragma solidity ^0.4.22;
 
-import "./Ownable.sol";
-import "./BitGuildToken.sol";
-import "./SafeMath.sol";
+import "../lib/Ownable.sol";
+import "../BitGuildToken.sol";
+import "../lib/SafeMath.sol";
 
 
 /*

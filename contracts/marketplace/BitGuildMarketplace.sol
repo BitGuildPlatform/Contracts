@@ -1,10 +1,10 @@
 pragma solidity ^0.4.22;
 
-import "./BitGuildToken.sol";
-import "./BitGuildAccessAdmin.sol";
-import "./BitGuildWhitelist.sol";
+import "../BitGuildToken.sol";
+import "../shared/BitGuildAccessAdmin.sol";
+import "../shared/BitGuildWhitelist.sol";
 import "./BitGuildFeeProvider.sol";
-import "./ERC721.sol";
+import "../lib/ERC721.sol";
 
 
 // @title ERC-721 Non-Fungible Token Standard

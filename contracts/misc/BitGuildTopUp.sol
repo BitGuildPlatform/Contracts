@@ -1,8 +1,8 @@
 pragma solidity ^0.4.20;
 
-import "./SafeMath.sol";
+import "../lib/SafeMath.sol";
 import "./PLATPriceOracle.sol";
-import "./BitGuildToken.sol";
+import "../BitGuildToken.sol";
 
 contract BitGuildTopUp {
   using SafeMath for uint256;
