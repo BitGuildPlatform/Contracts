@@ -1,9 +1,9 @@
 pragma solidity ^0.4.24;
 
-import "../shared/BitGuildAccessAdmin.sol";
+import "../lib/Operator.sol";
 import "./AvatarService.sol";
 import "../lib/ERC721.sol";
-contract AvatarOperator is BitGuildAccessAdmin {
+contract AvatarOperator is Operator {
 
   // every user can own avatar count
   uint8 public PER_USER_MAX_AVATAR_COUNT = 1;

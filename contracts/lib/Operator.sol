@@ -2,12 +2,12 @@ pragma solidity ^0.4.24;
 
 
 /**
- * @title BitGuildAccessAdmin
+ * @title Operator
  * @dev Allow two roles: 'owner' or 'operator'
  *      - owner: admin/superuser (e.g. with financial rights)
  *      - operator: can update configurations
  */
-contract BitGuildAccessAdmin {
+contract Operator {
     address public owner;
     address[] public operators;
 
@@ -22,7 +22,7 @@ contract BitGuildAccessAdmin {
     event OperatorAdded(address operator);
     event OperatorRemoved(address operator);
 
-    // @dev The BitGuildAccessAdmin constructor: sets owner to the sender account
+    // @dev sets owner to the sender account
     constructor() public {
         owner = msg.sender;
     }

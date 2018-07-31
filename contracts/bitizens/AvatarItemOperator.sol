@@ -1,9 +1,9 @@
 pragma solidity ^0.4.24;
 
-import "../shared/BitGuildAccessAdmin.sol";
+import "../lib/Operator.sol";
 import "./AvatarItemService.sol";
 import "../lib/ERC721.sol";
-contract AvatarItemOperator is BitGuildAccessAdmin {
+contract AvatarItemOperator is Operator {
 
   event AvatarItemCreateSuccess(address indexed _owner, uint256 _tokenId);
 

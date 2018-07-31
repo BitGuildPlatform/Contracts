@@ -1,6 +1,6 @@
 pragma solidity ^0.4.24;
 
-import "./ERC721ExtendToken.sol";
+import "../lib/ERC721ExtendToken.sol";
 import "./AvatarChildService.sol";
 import "./AvatarItemService.sol";
 

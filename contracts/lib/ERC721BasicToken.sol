@@ -1,13 +1,13 @@
 pragma solidity ^0.4.24;
 
-import "../lib/ERC721.sol";
-import "../lib/ERC721TokenReceiver.sol";
-import "../lib/SafeMath.sol";
-import "../lib/AddressUtils.sol";
-import "../lib/SupportsInterfaceWithLookup.sol";
-import "../shared/BitGuildAccessAdminExtend.sol";
+import "./ERC721.sol";
+import "./ERC721TokenReceiver.sol";
+import "./SafeMath.sol";
+import "./AddressUtils.sol";
+import "./SupportsInterfaceWithLookup.sol";
+import "./Pausable.sol";
 
-contract ERC721BasicToken is SupportsInterfaceWithLookup, ERC721, BitGuildAccessAdminExtend{
+contract ERC721BasicToken is SupportsInterfaceWithLookup, ERC721, Pausable{
 
   bytes4 public constant InterfaceId_ERC721 = 0x80ac58cd;
   /*
