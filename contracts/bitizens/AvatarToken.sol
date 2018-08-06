@@ -82,15 +82,22 @@ contract AvatarToken is ERC998TopDownToken, AvatarService {
     uint256 len = _childTokenIds.length;
     require(len > 0, "No token need to unmount");
     address tokenOwner = _ownerOf(_tokenId);
+    // ensure _tokenId(avatar) belong to msg.sender
     require(tokenOwner == msg.sender);
     uint256[] memory mountedTokens = childTokens[_tokenId][_childContract];
     require(mountedTokens.length > 0);
+    uint256[] memory unmountTokens = new uint256[](len);
     for(uint8 i = 0; i < len; ++i) {
       uint256 childTokenId = _childTokenIds[i];
-      _isMounted(mountedTokens, childTokenId);
-      _transferChild(msg.sender, _childContract, childTokenId);
+      // ensure the token is really belong to _tokenId(avatar)
+      if(_isMounted(mountedTokens, childTokenId)){
+        unmountTokens[i] = childTokenId;
+        _transferChild(msg.sender, _childContract, childTokenId);
+      } else {
+        unmountTokens[i] = 0;
+      }
     }
-    emit BatchUnmount(msg.sender,_tokenId,_childContract,_childTokenIds);
+    emit BatchUnmount(msg.sender, _tokenId, _childContract, unmountTokens);
   }
 
   // create avatar 
