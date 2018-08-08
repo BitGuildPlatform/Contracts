@@ -4,66 +4,37 @@ import "../lib/ERC721ExtendToken.sol";
 import "./AvatarChildService.sol";
 import "./AvatarItemService.sol";
 
-contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildService {
+contract AvatarItemToken is ERC721ExtendToken, AvatarChildService {
 
   event TokenBurned(address owner, uint256 tokenId, uint256 _totalBurned);
 
-  struct AvatarItem {
-    // the listed number, the number is from the content master list
-    uint32 listNumber;
-    // set number     
-    uint16 setNumber;
-    // true  => this itme is for avatar
-    // false => this item not for avatar
-    bool isBitizenItem;
-    // flase => This item is not part of a set    
-    // true => This item is a part of a set
-    bool isSet; 
-    // 00 => clothes  
-    // 01 => pet 
-    // type may be add in the future
-    uint8 types;
-    //01 => Common
-    //02 => Uncommon  
-    //03 => Rare      
-    //04 => Epic 
-    //05 => Legendary 
-    //06 => Godlike   
-    //07 => Unique
-    uint8 rarity;  
-    // 01 => Head
-    // 02 => Top
-    // 03 => Bottom
-    // 04 => Feet           
-    // 05 => Trinket      
-    // 06 => Acc  
-    // ...=> more 
-    uint8 socket;
-    // 00 => Male     
-    // 01 => Female     
-    // 10 => Male-only      
-    // 11 => Female-only
-    uint8 gender;
-    // extProps for future 
-    uint8 ext1;
-    // extProps for future
-    uint8 ext2;
+  struct Item {
+    address foundedBy;      // item founter
+    address createdBy;       // item createdBy 
+    bool isBitizenItem;    // true for avatar false for other
+    int16 probability;     // < 0 , decrease the mine time, > 0 increase get rarity item  = 0 nothing ,range to -10000 ~ 10000 mean -100% ~ 100%
+    uint256 node;          // node token id from node token, 0 from other
+    uint256 listNumber;     // list number
+    uint256 setNumber;      // set number
+    //attr0 rarity         01 => Common 02 => Uncommon  03 => Rare  04 => Epic 05 => Legendary 06 => Godlike   07 => Unique
+    //attr1 socket         01 => Head   02 => Top  03 => Bottom  04 => Feet  05 => Trinket  06 => Acc
+    //attr2 gender         00 => Male   01 => Female    10 => Male-only   11 => Female-only
+    //attr3 energy         increases extra mining times
+    //attr4 ext            ext attr for future
+    uint8[5] attr;
   }
 
-  // all token count
-  uint256 internal tokenIdIndex = 0;
-  // all token info
-  mapping(uint256 => AvatarItem) internal tokenInfo;
-  // burned token info
-  mapping(uint256 => AvatarItem) internal burnedTokens;
-
-  uint256[] internal burnTokenIds;
-
+  // item id index
+  uint256 internal itemIndex = 0;
+  // tokenId => item
+  mapping(uint256 => Item) internal itemInfo;
+  // burned tokenId => item
+  mapping(uint256 => Item) internal burnedItems;
+  
+  uint256[] internal burnedTokenIds;
+  // burned token id => burned ? true : false
   mapping(uint256 => bool) internal isBurnedByTokenId;
 
-  mapping(address => bool) internal defaultPermissionState;
-
-  // avatar count
   address public avatarAccount = 0xb891C4d89C1bF012F0014F56CE523F248A07F714;
 
   // for development use
@@ -72,41 +43,44 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
   }
 
   function getOwnedTokenIds(address _owner) external view onlyOperator returns(uint256[] _tokenIds) {
-    require(_owner != address(0), "Owner address not exist");
+    require(_owner != address(0), "address not exist");
     return ownedTokens[_owner];
   }
 
-  function getAvatarItemInfo(uint256 _tokenId)
-    external
+  function getTokenInfo(uint256 _tokenId)
+    external 
     view 
-    returns(
-    uint32 _listNumber,
-    uint16 _setNumber,
-    bool _isBitizenItem, 
-    bool _isSet, 
-    uint8[6] _attr
-    ){
-    (_listNumber,_setNumber,_isBitizenItem,_isSet,_attr) = _getAvatarItemInfo(_tokenId);
+    returns(address,address,bool,int16,uint256,uint256,uint256,uint8[5]){
+    require(exists(_tokenId),"token not exist");
+    Item storage item = itemInfo[_tokenId];
+    return (
+      item.foundedBy,
+      item.createdBy,
+      item.isBitizenItem,
+      item.probability,
+      item.node,
+      item.listNumber,
+      item.setNumber,
+      item.attr
+      );
   }
 
-  function getBurnedTokenInfo(uint256 _tokenId) external view returns(  
-    uint32 _listNumber,
-    uint16 _setNumber,
-    bool _isBitizenItem, 
-    bool _isSet, 
-    uint8[6] _attr){
+  function getBurnedTokenInfo(uint256 _tokenId)
+    external 
+    view 
+    returns(address,address,bool,int16,uint256,uint256,uint256,uint8[5]){
     require(isBurnedByTokenId[_tokenId], "Token invalid,maybe this token not burned");
-    AvatarItem storage item = burnedTokens[_tokenId];
-    _listNumber = item.listNumber;
-    _setNumber = item.setNumber;
-    _isBitizenItem = item.isBitizenItem;
-    _isSet = item.isSet;
-    _attr[0] = item.types;
-    _attr[1] = item.rarity;
-    _attr[2] = item.socket;      
-    _attr[3] = item.gender;
-    _attr[4] = item.ext1;
-    _attr[5] = item.ext2;  
+    Item storage item = burnedItems[_tokenId];
+    return (
+      item.foundedBy,
+      item.createdBy,
+      item.isBitizenItem,
+      item.probability,
+      item.node,
+      item.listNumber,
+      item.setNumber,
+      item.attr
+      );
   }
 
   function isBurned(uint256 _tokenId) external view returns (bool) {
@@ -114,157 +88,141 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
   }
 
   function getBurnedTokenCount() external view returns (uint256) {
-    return burnTokenIds.length;
+    return burnedTokenIds.length;
   }
 
   function getBurnedTokenIdByIndex(uint256 _index) external view returns (uint256) {
-    require(_index < burnTokenIds.length, "out of bound");
-    return burnTokenIds[_index];
+    require(_index < burnedTokenIds.length, "out of bound");
+    return burnedTokenIds[_index];
   }
 
   function burnToken(address _owner, uint256 _tokenId) external onlyOperator {
     _burnToken(_owner, _tokenId);
   }
   
-  function createAvatarItem( 
-    address _owner, 
-    uint32 _listNumber,
-    uint16 _setNumber,
+  function createToken( 
+    address _owner,
+    address _founder,
+    address _creator, 
     bool _isBitizenItem, 
-    bool _isSet, 
-    uint8 _types,
-    uint8 _rarity,
-    uint8 _socket,
-    uint8 _gender,
-    uint8 _ext1,
-    uint8 _ext2
-    ) 
+    int16 _probability,
+    uint256 _node,
+    uint256 _listNumber, 
+    uint256 _setNumber, 
+    uint8[5] _attr) 
     external 
     onlyOperator 
     returns(uint256 _tokenId){
-    _tokenId = _createAvatarItem(_owner, _listNumber, _setNumber, _isBitizenItem, _isSet, _types, _rarity, _socket, _gender, _ext1, _ext2);
+    _tokenId = _createToken(
+      _owner,
+      _mintToken(_founder, _creator, _isBitizenItem, _probability, _node,_listNumber,_setNumber, _attr));
   }
-
-  function batchCreateItem(
-    address _owner, 
-    uint32[] _listNumbers,
-    uint16[] _setNumbers,
+    
+  function batchCreateToken(
+    address _owner,
+    address[] _attrs1,  // double
     bool[] _isBitizenItems, 
-    bool[] _isSets, 
-    uint8[] _attrs
-    )    
+    int16[] _probabilitys,
+    uint256[] _attrs2,
+    uint8[] _attrs3  // six times
+    )
     external 
     onlyOperator
     returns(uint256[] _tokenIds) {
-    require(_listNumbers.length > 1,"Must batch create item can be excuse, not one");
+    require(_isBitizenItems.length > 1, "Must batch create item used, not one");
     // enure the array len are valid
-    require(_listNumbers.length == _setNumbers.length,"");
-    require(_listNumbers.length == _isBitizenItems.length,"");
-    require(_listNumbers.length == _isSets.length,"");
-    require(_listNumbers.length * 6 == _attrs.length,"");
-    _tokenIds = new uint256[](_listNumbers.length);
-    for(uint8 i = 0; i < _listNumbers.length; ++i) {
-      uint256 tokenId = _createAvatarItem( 
-        _owner,
-        _listNumbers[i],
-        _setNumbers[i],
-        _isBitizenItems[i],
-        _isSets[i],
-        _attrs[i * 6 + 0],
-        _attrs[i * 6 + 1],
-        _attrs[i * 6 + 2],
-        _attrs[i * 6 + 3],
-        _attrs[i * 6 + 4],
-        _attrs[i * 6 + 5]
-      );
-      _tokenIds[i] = tokenId;
+    require(_isBitizenItems.length * 2 == _attrs1.length, "");
+    require(_isBitizenItems.length * 3 == _attrs2.length, "");
+    require(_isBitizenItems.length * 5 == _attrs3.length, "");
+    _tokenIds = new uint256[](_isBitizenItems.length);
+    for(uint8 i = 0; i < _isBitizenItems.length; i++) {
+      uint8[5] memory attr;
+      attr[0] = _attrs3[i * 5 + 0]; 
+      attr[1] = _attrs3[i * 5 + 1];
+      attr[2] = _attrs3[i * 5 + 2];
+      attr[3] = _attrs3[i * 5 + 3];
+      attr[4] = _attrs3[i * 5 + 4];
+      Item memory _item = _mintToken(
+        _attrs1[i * 2 + 0],  
+        _attrs1[i * 2 + 1],   
+        _isBitizenItems[i],  
+        _probabilitys[i],  
+        _attrs2[i * 3 + 0],
+        _attrs2[i * 3 + 1],
+        _attrs2[i * 3 + 2],
+        attr
+        );
+      _createToken(_owner, _item);
     }
   }
 
   function compareItemSlots(uint256 _tokenId1, uint256 _tokenId2) external view returns (bool _res) {
-    require(_tokenId1 != _tokenId2 && exists(_tokenId1) && exists(_tokenId2),"");
-    uint8[6] memory attrs_1;
-    uint8[6] memory attrs_2;
-    (,,,,attrs_1) = _getAvatarItemInfo(_tokenId1);
-    (,,,,attrs_2) = _getAvatarItemInfo(_tokenId2);
-    _res = attrs_1[2] == attrs_2[2];
+    require(_tokenId1 != _tokenId2 && exists(_tokenId1) && exists(_tokenId2), "token error");
+    Item storage item1 = itemInfo[_tokenId1];
+    Item storage item2 = itemInfo[_tokenId2];
+    _res = item1.attr[2] == item2.attr[2];
   }
 
-  //get the detail of the given tokenId    
-  function _getAvatarItemInfo(uint256 _tokenId)
-    internal
-    view 
-    returns(
-    uint32 _listNumber,
-    uint16 _setNumber,
-    bool _isBitizenItem, 
-    bool _isSet, 
-    uint8[6] _attr
-    ){
-    require(exists(_tokenId), "The token is not exist");
-    AvatarItem storage item = tokenInfo[_tokenId];
-    _listNumber = item.listNumber;
-    _isBitizenItem = item.isBitizenItem;
-    _setNumber = item.setNumber;
-    _isSet = item.isSet;
-    _attr[0] = item.types;
-    _attr[1] = item.rarity;
-    _attr[2] = item.socket;      
-    _attr[3] = item.gender;
-    _attr[4] = item.ext1;
-    _attr[5] = item.ext2;  
+  function isSameItem(uint256 _tokenId1, uint256 _tokenId2) external view returns (bool _same){
+    require(_tokenId1 != _tokenId2, "tokens same");
+    _same = _getItemHash(_tokenId1) == _getItemHash(_tokenId2);
   }
 
-  function _createAvatarItem (
-    address _owner, 
-    uint32 _listNumber,
-    uint16 _setNumber,
+  function getItemHash(uint256 _tokenId) external view returns (bytes32) {
+    return _getItemHash(_tokenId);
+  }
+
+  function _getItemHash(uint256 _tokenId) private view returns (bytes32) {
+    require(exists(_tokenId), "token error");
+    Item storage item = itemInfo[_tokenId];
+    bytes memory itemBytes = abi.encodePacked(
+      item.foundedBy,
+      item.createdBy,
+      item.isBitizenItem,
+      item.probability,
+      item.node,
+      item.listNumber,
+      item.setNumber,
+      item.attr
+      );
+    return keccak256(itemBytes);
+  }
+ 
+  function _createToken(
+    address _owner,
+    Item _item
+    ) private returns(uint256){
+    require(_owner != address(0), "address invalid");
+    uint256 tokenId = ++itemIndex;
+    itemInfo[tokenId] = _item;
+    _mint(_owner, tokenId); 
+    return tokenId;
+  }
+
+  function _mintToken( 
+    address _founder,
+    address _creator, 
     bool _isBitizenItem, 
-    bool _isSet, 
-    uint8 _types,
-    uint8 _rarity,
-    uint8 _socket,
-    uint8 _gender,
-    uint8 _ext1,
-    uint8 _ext2
-    )
-    private 
-    returns(uint256){
-    require(_owner != address(0),"Owner address not exist");
-    AvatarItem memory avatarItem = AvatarItem ({
-      listNumber : _listNumber,
-      setNumber : _setNumber,
-      isBitizenItem : _isBitizenItem,
-      isSet : _isSet,
-      types : _types,
-      rarity : _rarity,
-      socket : _socket,
-      gender : _gender,
-      ext1 : _ext1,
-      ext2 : _ext2
-    });
-    tokenIdIndex++;
-    tokenInfo[tokenIdIndex] = avatarItem;
-    _mint(_owner, tokenIdIndex);
-    return tokenIdIndex;
+    int16 _probability,
+    uint256 _node,
+    uint256 _listNumber, 
+    uint256 _setNumber, 
+    uint8[5] _attr) private pure returns(Item _item){
+    require(_probability >= -10000 && _probability <= 10000, "out of bound");
+    _item = Item(_founder, _creator, _isBitizenItem, _probability, _node, _listNumber, _setNumber, _attr);
   }
 
   //Only the token owner have the permission to burn token
   function _burnToken(address _owner, uint256 _tokenId) private {
     require(exists(_tokenId),"Token not exist");
     require(_owner == _ownerOf(_tokenId),"Token not belong to _owner");
-
-    uint256 tokenIndex = allTokensIndex[_tokenId];
-    burnedTokens[_tokenId] = tokenInfo[tokenIndex];
-    burnTokenIds.push(_tokenId);
+    burnedTokenIds.push(_tokenId);
     isBurnedByTokenId[_tokenId] = true;
-    // set the index token is the last token
-    tokenInfo[tokenIndex] = tokenInfo[tokenIdIndex.sub(1)];
-    // reset the last token info as default
-    delete tokenInfo[tokenIdIndex.sub(1)];
+    burnedItems[_tokenId] = itemInfo[_tokenId];
+    delete itemInfo[_tokenId];
   
     _burn(_owner, _tokenId);
-    emit TokenBurned(_owner, _tokenId, burnTokenIds.length);
+    emit TokenBurned(_owner, _tokenId, burnedTokenIds.length);
   }
 
   // override 
@@ -275,6 +233,6 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
   }
 
   function () public payable {
-    revert();
+    revert("your eth get lost");
   }
 }

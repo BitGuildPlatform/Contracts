@@ -5,8 +5,8 @@ import "./AvatarItemService.sol";
 import "../lib/ERC721.sol";
 contract AvatarItemOperator is Ownable {
 
-  event ItemCreateSuccess(address indexed _owner, uint256 _tokenId);
-  event BatchItemCreateSuccess(address indexed _owner, uint256[] _tokenIds);
+  event ItemCreate(address indexed _owner, uint256 _tokenId);
+  event BatchCreateItem(address indexed _owner, uint256[] _tokenIds);
 
   AvatarItemService internal itemService;
 
@@ -14,53 +14,69 @@ contract AvatarItemOperator is Ownable {
     itemService = AvatarItemService(_addr);
   }
 
-  function createAvatarItem( 
-    address _owner,
-    uint32 _listNumber,
-    uint8 _setNumber,
-    bool _isBitizenItem, 
-    bool _isSet, 
-    uint8 _types,
-    uint8 _rarity,
-    uint8 _socket,
-    uint8 _gender,
-    uint8 _ext1,
-    uint8 _ext2
-    )
-    external 
-    onlyOwner 
-    returns(uint256 _tokenId) {
-    _tokenId = itemService.createAvatarItem(_owner,_listNumber,_setNumber,_isBitizenItem,_isSet,_types,_rarity,_socket,_gender,_ext1,_ext2);
-    emit ItemCreateSuccess(msg.sender, _tokenId);
-  }
-
   function getOwnedTokenIds() external view returns(uint256[] _tokenIds){
     _tokenIds = itemService.getOwnedTokenIds(msg.sender);
   }
 
-  function getAvatarItemInfo(uint256 _tokenId)
-    external
-    view 
-    returns(
+  function getTokenInfo(uint256 _tokenId)
+  external 
+  view 
+  returns(bool,bool,uint256,uint32,uint16,uint16,uint16,uint8[6]){
+    return ( itemService.getTokenInfo(_tokenId) );
+  }
+
+  function getBurnedTokenInfo(uint256 _tokenId)
+  external 
+  view 
+  returns(bool,bool,uint256,uint32,uint16,uint16,uint16,uint8[6]){
+    return ( itemService.getTokenInfo(_tokenId) );
+  } 
+
+  function isBurned(uint256 _tokenId) external view returns (bool) {
+    return itemService.isBurned(_tokenId);
+  }
+
+  function getBurnedTokenCount() external view returns (uint256){
+    return itemService.getBurnedTokenCount();
+  }
+
+  function getBurnedTokenIdByIndex(uint256 _index) external view returns (uint256){
+    return itemService.getBurnedTokenIdByIndex(_index);
+  }
+
+  function burnToken(uint256 _tokenId) external onlyOwner {
+    itemService.burnToken(msg.sender, _tokenId);
+  }
+
+  function createToken( 
+    address _owner, 
+    bool _isBitizenItem, 
+    bool _isSet, 
+    uint256 _from,
     uint32 _listNumber,
     uint16 _setNumber,
-    bool _isBitizenItem, 
-    bool _isSet,
-    uint8[6] _attr){
-    (_listNumber,_setNumber,_isBitizenItem,_isSet,_attr) = itemService.getAvatarItemInfo(_tokenId);
+    uint16 _cooldown,
+    uint16 _magic,
+    uint8[6] _attr) 
+    external 
+    onlyOwner
+    returns(uint256 _tokenId){
+    _tokenId = itemService.createToken(_owner,_isBitizenItem, _isSet, _from, _listNumber, _setNumber, _cooldown,_magic, _attr);
+    emit ItemCreate(_owner, _tokenId);
   }
-  
-  function batchCreateItem(
+
+  function batchCreateToken(
+    address _owner, 
+    bool[] _attrs1, 
+    uint256[] _froms,
     uint32[] _listNumbers,
-    uint16[] _setNumbers,
-    bool[] _isBitizenItems, 
-    bool[] _isSets, 
-    uint8[] _attrs
-    )    
+    uint16[] _attrs2,
+    uint8[] _attrs3
+    )
     external 
     onlyOwner
     returns(uint256[] _tokenIds){
-    _tokenIds = itemService.batchCreateItem(msg.sender, _listNumbers, _setNumbers, _isBitizenItems, _isSets, _attrs);
-    emit BatchItemCreateSuccess(msg.sender, _tokenIds);
+    _tokenIds = itemService.batchCreateToken(_owner,_attrs1, _froms, _listNumbers, _attrs2, _attrs3);
+    emit BatchCreateItem(_owner, _tokenIds);
   }
 }
