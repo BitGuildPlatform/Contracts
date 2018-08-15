@@ -5,14 +5,12 @@ import "./AvatarItemService.sol";
 import "../lib/ERC721.sol";
 contract AvatarItemOperator is Ownable {
 
-  event CreateToken(address indexed _owner, uint256 indexed _tokenId);
   event BatchCreateToken(address indexed _owner, uint256[] _tokenIds);
-  event BurnToken(address indexed _owner, uint256 indexed _tokenId);
 
   AvatarItemService internal itemService;
-  
-  function injectItemService(address _addr) external onlyOwner {
-    itemService = AvatarItemService(_addr);
+
+  function injectItemService(AvatarItemService _itemService) external onlyOwner {
+    itemService = AvatarItemService(_itemService);
   }
 
   function getOwnedTokenIds() external view returns(uint256[] _tokenIds) {
@@ -26,63 +24,19 @@ contract AvatarItemOperator is Ownable {
     return itemService.getTokenInfo(_tokenId);
   }
 
-  function isBurned(uint256 _tokenId) external view returns (bool) {
-    return itemService.isBurned(_tokenId);
-  }
-
-  function getBurnedTokenCount() external view returns (uint256) {
-    return itemService.getBurnedTokenCount();
-  }
-  
-  function getBurnedTokenIdByIndex(uint256 _index) external view returns (uint256) {
-    return itemService.getBurnedTokenIdByIndex(_index);
-  }
-
-  function getSameItemTokenIds(uint256 _tokenId) external view returns(uint256[]) {
-    return itemService.getSameItemTokenIds(_tokenId);
-  }
-
-  function isSameItem(uint256 _tokenId1, uint256 _tokenId2) external view returns (bool) {
-    return itemService.isSameItem(_tokenId1,_tokenId2);
-  }
-
-  function getMineTrack(uint256 _tokenId) external view returns (uint256[]){
-    return itemService.getMineTrack(_tokenId);
-  }
-
-  function burnToken(uint256 _tokenId) external {
-    itemService.burnToken(msg.sender, _tokenId);
-    emit BurnToken(msg.sender, _tokenId);
-  }
-
-  function createToken( 
-    address _owner,
-    address _founder,
-    address _creator,
-    bool _isBitizenItem,
-    int16 _probability,
-    uint256[4] _attr1,
-    uint8[5] _attr2) 
-    external
-    onlyOwner
-    returns(uint256 _tokenId) {
-    _tokenId = _mintToken(_owner, _founder, _creator, _isBitizenItem, _probability, _attr1, _attr2);
-    emit CreateToken(_owner, _tokenId);
-  }
-  
   function batchCreateToken(
     address _owner,
-    bool[] _isBitizenItems,  // base length
-    int16[] _probabilities,  // one time
-    address[] _addresses,    // two times 
-    uint256[] _attrs1,       // four times 
-    uint8[] _attrs2          // five times
+    bool[] _isBitizenItems, 
+    int16[] _probabilities, 
+    address[] _addresses,   
+    uint256[] _attrs1,      
+    uint8[] _attrs2         
     )
     external 
     onlyOwner
     returns(uint256[] _tokenIds) {
     // enure the array len are valid
-    require(_isBitizenItems.length > 0);
+    require(_isBitizenItems.length > 0, "no data provide");
     require(_isBitizenItems.length * 1 == _probabilities.length);
     require(_isBitizenItems.length * 2 == _addresses.length);
     require(_isBitizenItems.length * 4 == _attrs1.length);
@@ -91,7 +45,7 @@ contract AvatarItemOperator is Ownable {
     for(uint8 i = 0; i < _isBitizenItems.length; i++) {
       _tokenIds[i] = _mintToken(
         _owner,
-        _addresses[i * 2 + 0],
+        _addresses[i * 2],
         _addresses[i * 2 + 1],
         _isBitizenItems[i],
         _probabilities[i],
@@ -110,23 +64,27 @@ contract AvatarItemOperator is Ownable {
     int16 _probability,
     uint256[4] _attr1,
     uint8[5] _attr2) 
-    private 
+    internal 
     returns(uint256 _tokenId) {
     _tokenId = itemService.createToken(_owner, _founder, _creator, _isBitizenItem, _probability, _attr1, _attr2);
   }
 
-  function _convertToAttr1(uint8 _index, uint256[] _attrs1) private pure returns (uint256[4] _attr2) {
-    _attr2[0] = _attrs1[_index * 4 + 0];
-    _attr2[1] = _attrs1[_index * 4 + 1];
-    _attr2[2] = _attrs1[_index * 4 + 2];
-    _attr2[3] = _attrs1[_index * 4 + 3];
+  function _convertToAttr1(uint8 _index, uint256[] _attrs1) private pure returns (uint256[4] _attr1) {
+    _attr1[0] = _attrs1[_index * 4];
+    _attr1[1] = _attrs1[_index * 4 + 1];
+    _attr1[2] = _attrs1[_index * 4 + 2];
+    _attr1[3] = _attrs1[_index * 4 + 3];
   }
 
-  function _convertToAttr2(uint8 _index, uint8[] _attrs2) private pure returns (uint8[5] _attr3) {
-    _attr3[0] = _attrs2[_index * 5 + 0]; 
-    _attr3[1] = _attrs2[_index * 5 + 1];
-    _attr3[2] = _attrs2[_index * 5 + 2];
-    _attr3[3] = _attrs2[_index * 5 + 3];
-    _attr3[4] = _attrs2[_index * 5 + 4];
+  function _convertToAttr2(uint8 _index, uint8[] _attrs2) private pure returns (uint8[5] _attr2) {
+    _attr2[0] = _attrs2[_index * 5]; 
+    _attr2[1] = _attrs2[_index * 5 + 1];
+    _attr2[2] = _attrs2[_index * 5 + 2];
+    _attr2[3] = _attrs2[_index * 5 + 3];
+    _attr2[4] = _attrs2[_index * 5 + 4];
+  }
+
+  function () public {
+    revert();
   }
 }
