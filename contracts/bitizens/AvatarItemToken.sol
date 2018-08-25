@@ -7,16 +7,17 @@ import "./AvatarItemService.sol";
 contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildService {
 
   struct AvatarItem {
-    address foundedBy;    // item founder
-    address createdBy;    // item creator
+    string foundedBy;     // item founder
+    string createdBy;     // item creator
     bool isBitizenItem;   // true for bitizen false for other
-    int16 probability;    // < 0 , decrease the mine time, > 0 increase get rare item, range to -10000 ~ 10000 mean -100.00% ~ 100.00%
+    uint16 miningTime;    // decrease the mine time, range to 0 ~ 10000/0.00% ~ 100.00%
+    uint16 magicFind;     // increase get rare item, range to 0 ~ 10000/0.00% ~ 100.00%
     uint256 node;         // node token id 
     uint256 listNumber;   // list number
     uint256 setNumber;    // set number
     uint256 quality;      // quality of item 
     uint8 rarity;         // 01 => Common 02 => Uncommon  03 => Rare  04 => Epic 05 => Legendary 06 => Godlike 10 => Limited
-    uint8 socket;         // 01 => Head   02 => Top  03 => Bottom  04 => Feet  05 => Trinket  06 => Acc  07 => Props
+    uint8 socket;         // 01 => Head   02 => Top  03 => Bottom  04 => Feet  05 => Trinket  06 => Acc  07 => Props 
     uint8 gender;         // 00 => Male   01 => Female 10 => Male-only 11 => Female-only  Unisex => 99
     uint8 energy;         // increases extra mining times
     uint8 ext;            // extra attribute for future
@@ -36,7 +37,7 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
   mapping(uint256 => bytes8) internal tokenIdToHash;
   // item token id => transfer count
   mapping(uint256 => uint256) itemTransferCount;
-  
+
   // avatar address, add default permission to handle item
   address public avatarAccount = 0xb891C4d89C1bF012F0014F56CE523F248A07F714;
 
@@ -50,7 +51,7 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     require(exists(_tokenId), "token error");
     _;
   }
-  // just for test
+
   function setDefaultApprovalAccount(address _account) public onlyOwner {
     avatarAccount = _account;
   }
@@ -78,7 +79,7 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     external 
     view 
     validToken(_tokenId)
-    returns(address, address, bool, int16, uint256[4] _attr1, uint8[5] _attr2) {
+    returns(string, string, bool, uint256[4] _attr1, uint8[5] _attr2, uint16[2] _attr3) {
     AvatarItem storage item = tokenInfo[_tokenId];
     _attr1[0] = item.node;
     _attr1[1] = item.listNumber;
@@ -89,7 +90,9 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     _attr2[2] = item.gender;
     _attr2[3] = item.energy;
     _attr2[4] = item.ext;
-    return (item.foundedBy, item.createdBy, item.isBitizenItem, item.probability, _attr1, _attr2);
+    _attr3[0] = item.miningTime;
+    _attr3[1] = item.magicFind;
+    return (item.foundedBy, item.createdBy, item.isBitizenItem, _attr1, _attr2, _attr3);
   }
 
   function isBurned(uint256 _tokenId) external view validToken(_tokenId) returns (bool) {
@@ -139,17 +142,17 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
 
   function createToken( 
     address _owner,
-    address _founder,
-    address _creator, 
+    string _founder,
+    string _creator, 
     bool _isBitizenItem, 
-    int16 _probability,
     uint256[4] _attr1,
-    uint8[5] _attr2)
+    uint8[5] _attr2,
+    uint16[2] _attr3)
     external  
     onlyOperator
     returns(uint256 _tokenId) {
     require(_owner != address(0), "address invalid");
-    AvatarItem memory item = _mintToken(_founder, _creator, _isBitizenItem, _probability, _attr1, _attr2);
+    AvatarItem memory item = _mintToken(_founder, _creator, _isBitizenItem, _attr1, _attr2, _attr3);
     _tokenId = ++tokenIndex;
     tokenInfo[_tokenId] = item;
     _mint(_owner, _tokenId);
@@ -159,7 +162,8 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
   function updateToken(
     uint256 _tokenId,
     bool  _isBitizenItem,
-    int16 _probability,
+    uint16 _miningTime,
+    uint16 _magicFind,
     uint256 _node,
     uint256 _listNumber,
     uint256 _setNumber,
@@ -172,9 +176,9 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
   ) 
   external 
   onlyOperator
-  tokenExists(_tokenId) {
+  tokenExists(_tokenId){
     require(_deleteOldValue(_tokenId)); // this checking should be always through
-    _updateToken(_tokenId,_isBitizenItem,_probability,_node,_listNumber,_setNumber,_quality,_rarity,_socket,_gender,_energy,_ext);
+    _updateToken(_tokenId,_isBitizenItem,_miningTime,_magicFind,_node,_listNumber,_setNumber,_quality,_rarity,_socket,_gender,_energy,_ext);
     _saveItemHash(_tokenId);
   }
 
@@ -202,7 +206,8 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     AvatarItem storage item = tokenInfo[_tokenId];
     bytes memory itemBytes = abi.encodePacked(
       item.isBitizenItem,
-      item.probability,
+      item.miningTime,
+      item.magicFind,
       item.node,
       item.listNumber,
       item.setNumber,
@@ -217,21 +222,21 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
   }
 
   function _mintToken(  
-    address _foundedBy,
-    address _createdBy, 
+    string _foundedBy,
+    string _createdBy, 
     bool _isBitizenItem, 
-    int16 _probability,
     uint256[4] _attr1, 
-    uint8[5] _attr2) 
+    uint8[5] _attr2,
+    uint16[2] _attr3) 
     private
     pure
     returns(AvatarItem _item) {
-    require(_probability >= -10000 && _probability <= 10000, "out of range");
     _item = AvatarItem(
       _foundedBy,
       _createdBy,
       _isBitizenItem, 
-      _probability, 
+      _attr3[0], 
+      _attr3[1], 
       _attr1[0],
       _attr1[1], 
       _attr1[2], 
@@ -247,7 +252,8 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
   function _updateToken(
     uint256 _tokenId,
     bool  _isBitizenItem,
-    int16 _probability,
+    uint16 _miningTime,
+    uint16 _magicFind,
     uint256 _node,
     uint256 _listNumber,
     uint256 _setNumber,
@@ -260,7 +266,8 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
   ) private {
     AvatarItem storage item = tokenInfo[_tokenId];
     item.isBitizenItem = _isBitizenItem;
-    item.probability = _probability;
+    item.miningTime = _miningTime;
+    item.magicFind = _magicFind;
     item.node = _node;
     item.listNumber = _listNumber;
     item.setNumber = _setNumber;

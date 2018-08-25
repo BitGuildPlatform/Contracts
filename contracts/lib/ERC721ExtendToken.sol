@@ -24,7 +24,7 @@ contract ERC721ExtendToken is ERC721BasicToken, ERC721Enumerable, ERC721Metadata
    *   bytes4(keccak256('symbol()')) ^
    *   bytes4(keccak256('tokenURI(uint256)'))
    */
-  string internal BASE_URL = "https://www.google.com/00000000";
+  string internal BASE_URL = "https://www.mybitizen.com/00000000";
 
   // Mapping from owner to list of owned token IDs
   mapping(address => uint256[]) internal ownedTokens;

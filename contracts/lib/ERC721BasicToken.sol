@@ -53,7 +53,7 @@ contract ERC721BasicToken is SupportsInterfaceWithLookup, ERC721, Pausable{
    * @param _tokenId uint256 ID of the token to validate its ownership belongs to msg.sender
    */
   modifier onlyOwnerOf(uint256 _tokenId) {
-    require(_ownerOf(_tokenId) == msg.sender,"This avatar not owned by this address");
+    require(_ownerOf(_tokenId) == msg.sender,"This token not owned by this address");
     _;
   }
   
