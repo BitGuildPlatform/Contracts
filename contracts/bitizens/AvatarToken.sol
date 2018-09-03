@@ -1,129 +1,151 @@
 pragma solidity ^0.4.24;
 
-
 import "../lib/ERC998TopDownToken.sol";
-import "./AvatarChildService.sol";
-import "../lib/UrlStr.sol";
-import "./AvatarService.sol";
+import "../bitizens/AvatarChildService.sol";
+import "../bitizens/AvatarService.sol";
 
 contract AvatarToken is ERC998TopDownToken, AvatarService {
   
   using UrlStr for string;
 
-  event BatchMount(address indexed from, uint256 parent, address indexed childAddr, uint256[] children);
-  event BatchUnmount(address indexed from, uint256 parent, address indexed childAddr, uint256[] children);
- 
+  enum ChildHandleType{NULL, MOUNT, UNMOUNT}
+
+  event ChildHandle(address indexed from, uint256 parent, address indexed childAddr, uint256[] children, ChildHandleType _type);
+
+  event AvatarTransferStateChanged(address indexed _owner, bool _newState);
+
   struct Avatar {
     // avatar name
     string name;
-    // avatar gen,this decide the avatar appearance 
+    // avatar gen,this decide avatar appearance 
     uint256 dna;
   }
+  
+  // avatar id index
+  uint256 internal avatarIndex = 0;
+  // avatar id => avatar
+  mapping(uint256 => Avatar) avatars;
+  // true avatar can do transfer 
+  bool public avatarTransferState = false;
 
-  // For erc721 metadata
-  string internal BASE_URL = "https://www.bitguild.com/bitizens/api/avatar/getAvatar/00000000";
-
-  Avatar[] avatars;
+  function changeAvatarTransferState(bool _newState) public onlyOwner {
+    if(avatarTransferState == _newState) return;
+    avatarTransferState = _newState;
+    emit AvatarTransferStateChanged(owner, avatarTransferState);
+  }
 
   function createAvatar(address _owner, string _name, uint256 _dna) external onlyOperator returns(uint256) {
     return _createAvatar(_owner, _name, _dna);
   }
 
-  function getMountTokenIds(address _owner, uint256 _tokenId, address _avatarItemAddress)
+  function getMountedChildren(address _owner, uint256 _avatarId, address _childAddress)
   external
   view 
   onlyOperator
-  existsToken(_tokenId) 
+  existsToken(_avatarId) 
   returns(uint256[]) {
-    require(tokenIdToTokenOwner[_tokenId] == _owner);
-    return childTokens[_tokenId][_avatarItemAddress];
+    require(_childAddress != address(0));
+    require(tokenIdToTokenOwner[_avatarId] == _owner);
+    return childTokens[_avatarId][_childAddress];
   }
   
-  function updateAvatarInfo(address _owner, uint256 _tokenId, string _name, uint256 _dna) external onlyOperator existsToken(_tokenId){
+  function updateAvatarInfo(address _owner, uint256 _avatarId, string _name, uint256 _dna) external onlyOperator existsToken(_avatarId){
     require(_owner != address(0), "Invalid address");
-    require(_owner == tokenIdToTokenOwner[_tokenId] || msg.sender == owner);
-    Avatar storage avatar = avatars[allTokensIndex[_tokenId]];
+    require(_owner == tokenIdToTokenOwner[_avatarId] || msg.sender == owner);
+    Avatar storage avatar = avatars[_avatarId];
     avatar.name = _name;
     avatar.dna = _dna;
   }
 
-  function updateBaseURI(string _url) external onlyOperator {
-    BASE_URL = _url;
+  function getOwnedAvatars(address _owner) external view onlyOperator returns(uint256[] _avatars) {
+    require(_owner != address(0));
+    _avatars = ownedTokens[_owner];
   }
 
-  function tokenURI(uint256 _tokenId) external view existsToken(_tokenId) returns (string) {
-    return BASE_URL.generateUrl(_tokenId);
-  }
-
-  function getOwnedTokenIds(address _owner) external view returns(uint256[] _tokenIds) {
-    _tokenIds = ownedTokens[_owner];
-  }
-
-  function getAvatarInfo(uint256 _tokenId) external view existsToken(_tokenId) returns(string _name, uint256 _dna) {
-    Avatar storage avatar = avatars[allTokensIndex[_tokenId]];
+  function getAvatarInfo(uint256 _avatarId) external view existsToken(_avatarId) returns(string _name, uint256 _dna) {
+    Avatar storage avatar = avatars[_avatarId];
     _name = avatar.name;
     _dna = avatar.dna;
   }
 
-  function batchMount(address _childContract, uint256[] _childTokenIds, uint256 _tokenId) external {
-    uint256 _len = _childTokenIds.length;
-    require(_len > 0, "No token need to mount");
-    address tokenOwner = _ownerOf(_tokenId);
-    require(tokenOwner == msg.sender);
-    for(uint8 i = 0; i < _len; ++i) {
-      uint256 childTokenId = _childTokenIds[i];
-      require(ERC721(_childContract).ownerOf(childTokenId) == tokenOwner);
-      _getChild(msg.sender, _tokenId, _childContract, childTokenId);
+  function unmount(address _owner, address _childContract, uint256[] _children, uint256 _avatarId) external onlyOperator {
+    if(_children.length == 0) return;
+    require(ownerOf(_avatarId) == _owner); // check avatar owner
+    uint256[] memory mountedChildren = childTokens[_avatarId][_childContract]; 
+    if (mountedChildren.length == 0) return;
+    uint256[] memory unmountChildren = new uint256[](_children.length); // record unmount children 
+    for(uint8 i = 0; i < _children.length; i++) {
+      uint256 child = _children[i];
+      if(_isMounted(mountedChildren, child)){  
+        unmountChildren[i] = child;
+        _removeChild(_avatarId, _childContract, child);
+        ERC721(_childContract).transferFrom(this, _owner, child);
+      }
     }
-    emit BatchMount(msg.sender, _tokenId, _childContract, _childTokenIds);
-  }
- 
-  function batchUnmount(address _childContract, uint256[] _childTokenIds, uint256 _tokenId) external {
-    uint256 len = _childTokenIds.length;
-    require(len > 0, "No token need to unmount");
-    address tokenOwner = _ownerOf(_tokenId);
-    require(tokenOwner == msg.sender);
-    for(uint8 i = 0; i < len; ++i) {
-      uint256 childTokenId = _childTokenIds[i];
-      _transferChild(msg.sender, _childContract, childTokenId);
-    }
-    emit BatchUnmount(msg.sender,_tokenId,_childContract,_childTokenIds);
+    if(unmountChildren.length > 0 ) 
+      emit ChildHandle(_owner, _avatarId, _childContract, unmountChildren, ChildHandleType.UNMOUNT);
   }
 
-  // create avatar 
-  function _createAvatar(address _owner, string _name, uint256 _dna) private returns(uint256 _tokenId) {
-    require(_owner != address(0));
-    Avatar memory avatar = Avatar(_name, _dna);
-    _tokenId = avatars.push(avatar);
-    _mint(_owner, _tokenId);
+  function mount(address _owner, address _childContract, uint256[] _children, uint256 _avatarId) external onlyOperator {
+    if(_children.length == 0) return;
+    require(ownerOf(_avatarId) == _owner); // check avatar owner
+    for(uint8 i = 0; i < _children.length; i++) {
+      uint256 child = _children[i];
+      require(ERC721(_childContract).ownerOf(child) == _owner); // check child owner  
+      _receiveChild(_owner, _avatarId, _childContract, child);
+      ERC721(_childContract).transferFrom(_owner, this, child);
+    }
+    emit ChildHandle(_owner, _avatarId, _childContract, _children, ChildHandleType.MOUNT);
   }
 
-  function _unmountSameSocketItem(address _owner, uint256 _tokenId, address _childContract, uint256 _childTokenId) internal {
-    uint256[] storage tokens = childTokens[_tokenId][_childContract];
-    for(uint256 i = 0; i < tokens.length; ++i) {
-      // if the child no compareItemSlots(uint256,uint256) ,this will lead to a error and stop this operate
-      if(AvatarChildService(_childContract).compareItemSlots(tokens[i], _childTokenId)) {
-        // unmount the old avatar item
-        _transferChild(_owner, _childContract, tokens[i]);
+  // check every have mounted children with the will mount child relationship
+  function _checkChildRule(address _owner, uint256 _avatarId, address _childContract, uint256 _child) internal {
+    uint256[] memory tokens = childTokens[_avatarId][_childContract];
+    if (tokens.length == 0) {
+      if (!AvatarChildService(_childContract).isAvatarChild(_child)) {
+        revert("it can't be avatar child");
+      }
+    }
+    for (uint256 i = 0; i < tokens.length; i++) {
+      if (AvatarChildService(_childContract).compareItemSlots(tokens[i], _child)) {
+        _removeChild(_avatarId, _childContract, tokens[i]);
+        ERC721(_childContract).transferFrom(this, _owner, tokens[i]);
       }
     }
   }
+  /// false will ignore not mounted children on this avatar and not exist children
+  function _isMounted(uint256[] mountedChildren, uint256 _toMountToken) private pure returns (bool) {
+    for(uint8 i = 0; i < mountedChildren.length; i++) {
+      if(mountedChildren[i] == _toMountToken){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // create avatar 
+  function _createAvatar(address _owner, string _name, uint256 _dna) private returns(uint256 _avatarId) {
+    require(_owner != address(0));
+    Avatar memory avatar = Avatar(_name, _dna);
+    _avatarId = ++avatarIndex;
+    avatars[_avatarId] = avatar;
+    _mint(_owner, _avatarId);
+  }
 
   // override  
-  function _transfer(address _from, address _to, uint256 _tokenId) internal whenNotPaused {
-    // not allown to transfer when  only one  avatar 
-    require(tokenOwnerToTokenCount[_from] > 1);
-    super._transfer(_from, _to, _tokenId);
+  function _transferFrom(address _from, address _to, uint256 _avatarId) internal whenNotPaused {
+    // add transfer control
+    require(avatarTransferState == true, "current time not allown transfer avatar");
+    super._transferFrom(_from, _to, _avatarId);
   }
 
   // override
-  function _getChild(address _from, uint256 _tokenId, address _childContract, uint256 _childTokenId) internal {
-    _unmountSameSocketItem(_from, _tokenId, _childContract, _childTokenId);
-    super._getChild(_from, _tokenId, _childContract, _childTokenId);
+  function _receiveChild(address _from, uint256 _avatarId, address _childContract, uint256 _childTokenId) internal whenNotPaused {
+    _checkChildRule(_from, _avatarId, _childContract, _childTokenId);
+    super._receiveChild(_from, _avatarId, _childContract, _childTokenId);
   }
 
-  function () external payable {
+  function () public payable {
     revert();
   }
-
 }

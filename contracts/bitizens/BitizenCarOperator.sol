@@ -3,7 +3,7 @@ pragma solidity ^0.4.24;
 import "../lib/Operator.sol";
 import "./BitizenCarService.sol";
 import "../lib/ERC721.sol";
-contract BitizenCarOp is Operator {
+contract BitizenCarOperator is Operator {
 
   event CreateCar(address indexed _owner, uint256 _carId);
   
@@ -42,5 +42,4 @@ contract BitizenCarOp is Operator {
     emit CreateCar(msg.sender, carId);
     return carId;
   }
-
 }

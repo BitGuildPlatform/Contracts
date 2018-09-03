@@ -4,8 +4,12 @@ import "../lib/ERC721ExtendToken.sol";
 
 
 contract BitizenCarToken is ERC721ExtendToken {
+  
+  enum CarHandleType{NULL, CREATE_CAR, UPDATE_CAR, BURN_CAR}
 
   event TransferStateChanged(address indexed _owner, bool _state);
+  
+  event CarHandleEvent(address indexed _owner, uint256 indexed _carId, CarHandleType _type);
 
   struct BitizenCar{
     string foundBy; // founder name
@@ -26,7 +30,7 @@ contract BitizenCarToken is ERC721ExtendToken {
   mapping(uint256 => bool) internal isBurned;
 
   // add a switch to handle transfer
-  bool public transferState = false;
+  bool public carTransferState = false;
 
   modifier validCar(uint256 _carId) {
     require(_carId > 0 && _carId <= carIndex, "invalid car");
@@ -34,9 +38,9 @@ contract BitizenCarToken is ERC721ExtendToken {
   }
 
   function changeTransferState(bool _newState) public onlyOwner {
-    require(transferState != _newState, "current state is you want to be");
-    transferState = _newState;
-    emit TransferStateChanged(owner, transferState);
+    if(carTransferState == _newState) return;
+    carTransferState = _newState;
+    emit TransferStateChanged(owner, carTransferState);
   }
 
   function isBurnedCar(uint256 _carId) external view validCar(_carId) returns (bool) {
@@ -62,12 +66,13 @@ contract BitizenCarToken is ERC721ExtendToken {
     return ownedTokens[_owner];
   }
 
-  function createCar(address _owner, string _newFoundBy, uint8 _type, uint8 _ext) external onlyOperator returns(uint256) {
+  function createCar(address _owner, string _foundBy, uint8 _type, uint8 _ext) external onlyOperator returns(uint256) {
     require(_owner != address(0));
-    BitizenCar memory car = BitizenCar(_newFoundBy, _type, _ext);
+    BitizenCar memory car = BitizenCar(_foundBy, _type, _ext);
     uint256 carId = ++carIndex;
     carInfos[carId] = car;
     _mint(_owner, carId);
+    emit CarHandleEvent(_owner, carId, CarHandleType.CREATE_CAR);
     return carId;
   }
 
@@ -77,20 +82,25 @@ contract BitizenCarToken is ERC721ExtendToken {
     car.foundBy = _newFoundBy;
     car.carType = _type;
     car.ext = _ext;
+    emit CarHandleEvent(_ownerOf(_carId), _carId, CarHandleType.UPDATE_CAR);
   }
 
   function burnCar(address _owner, uint256 _carId) external onlyOperator {
-    require(_owner == _ownerOf(_carId), "no permission");
     burnedCars.push(_carId);
     isBurned[_carId] = true;
     _burn(_owner, _carId);
+    emit CarHandleEvent(_owner, _carId, CarHandleType.BURN_CAR);
   }
 
   // override
   // add transfer condition
   function _transfer(address _from,address _to,uint256 _tokenId) internal {
-    require(transferState == true, "not allown transfer at current time");
+    require(carTransferState == true, "not allown transfer at current time");
     super._transfer(_from, _to, _tokenId);
+  }
+
+  function () public payable {
+    revert();
   }
 
 }

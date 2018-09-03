@@ -5,8 +5,14 @@ import "./AvatarItemService.sol";
 import "../lib/ERC721.sol";
 contract AvatarItemOperator is Operator {
 
-  event ItemCreated(address indexed _owner, uint256 _tokenId);
-  event LimitedItemCreated(address indexed _owner, uint256 _tokenId);
+  enum ItemRarity{
+    NULL,
+    RARITY_LIMITED,
+    RARITY_OTEHR
+  }
+
+  event ItemCreated(address indexed _owner, uint256 _itemId, ItemRarity _type);
+ 
   event UpdateLimitedItemCount(bytes8 _hash, uint256 _maxCount);
 
   // item hash => max value 
@@ -28,48 +34,48 @@ contract AvatarItemOperator is Operator {
     ERC721Service = ERC721(_itemService);
   }
 
-  function getOwnedTokenIds() external view returns(uint256[] _tokenIds) {
-    return itemService.getOwnedTokenIds(msg.sender);
+  function getOwnedItems() external view returns(uint256[] _itemIds) {
+    return itemService.getOwnedItems(msg.sender);
   }
 
-  function getTokenInfo(uint256 _tokenId)
+  function getItemInfo(uint256 _itemId)
     external 
     view 
     returns(string, string, bool, uint256[4] _attr1, uint8[5] _attr2, uint16[2] _attr3) {
-    return itemService.getTokenInfo(_tokenId);
+    return itemService.getItemInfo(_itemId);
   }
 
-  function getSameItemCount(uint256 _tokenId) external view returns(uint256){
-    return itemService.getSameItemCount(_tokenId);
+  function getSameItemCount(uint256 _itemId) external view returns(uint256){
+    return itemService.getSameItemCount(_itemId);
   }
 
-  function getSameItemTokenIdByIndex(uint256 _tokenId, uint256 _index) external view returns(uint256){
-    return itemService.getSameItemTokenIdByIndex(_tokenId, _index);
+  function getSameItemIdByIndex(uint256 _itemId, uint256 _index) external view returns(uint256){
+    return itemService.getSameItemIdByIndex(_itemId, _index);
   }
 
-  function getItemHash(uint256 _tokenId) external view  returns (bytes8) {
-    return itemService.getItemHash(_tokenId);
+  function getItemHash(uint256 _itemId) external view  returns (bytes8) {
+    return itemService.getItemHash(_itemId);
   }
 
-  function isSameItem(uint256 _tokenId1, uint256 _tokenId2) external view returns (bool) {
-    return itemService.isSameItem(_tokenId1,_tokenId2);
+  function isSameItem(uint256 _itemId1, uint256 _itemId2) external view returns (bool) {
+    return itemService.isSameItem(_itemId1,_itemId2);
   }
 
-  function getLimitedValue(uint256 _tokenId) external view returns(uint256) {
-    return itemLimitedCount[itemService.getItemHash(_tokenId)];
+  function getLimitedValue(uint256 _itemId) external view returns(uint256) {
+    return itemLimitedCount[itemService.getItemHash(_itemId)];
   }
   // return the item position when get it in all same items
-  function getItemPosition(uint256 _tokenId) external view returns (uint256 _pos) {
-    require(ERC721Service.ownerOf(_tokenId) != address(0), "token not exist");
-    _pos = itemPosition[_tokenId];
+  function getItemPosition(uint256 _itemId) external view returns (uint256 _pos) {
+    require(ERC721Service.ownerOf(_itemId) != address(0), "token not exist");
+    _pos = itemPosition[_itemId];
   }
 
-  function updateLimitedItemCount(bytes8 _itemBytes8, uint256 _count) public onlyOwner {
+  function updateLimitedItemCount(bytes8 _itemBytes8, uint256 _count) public onlyOperator {
     itemLimitedCount[_itemBytes8] = _count;
     emit UpdateLimitedItemCount(_itemBytes8, _count);
   }
   
-  function createToken( 
+  function createItem( 
     address _owner,
     string _founder,
     string _creator,
@@ -79,15 +85,14 @@ contract AvatarItemOperator is Operator {
     uint16[2] _attr3) 
     external 
     onlyOperator
-    returns(uint256 _tokenId) {
+    returns(uint256 _itemId) {
     require(_attr3[0] >= 0 && _attr3[0] <= 10000, "param must be range to 0 ~ 10000 ");
     require(_attr3[1] >= 0 && _attr3[1] <= 10000, "param must be range to 0 ~ 10000 ");
-    _tokenId = _mintToken(_owner, _founder, _creator, _isBitizenItem, _attr1, _attr2, _attr3);
-  
+    _itemId = _mintItem(_owner, _founder, _creator, _isBitizenItem, _attr1, _attr2, _attr3);
   }
 
   // add limited item check 
-  function _mintToken( 
+  function _mintItem( 
     address _owner,
     string _founder,
     string _creator,
@@ -97,21 +102,21 @@ contract AvatarItemOperator is Operator {
     uint16[2] _attr3) 
     internal 
     returns(uint256) {
-    uint256 tokenId = itemService.createToken(_owner, _founder, _creator, _isBitizenItem, _attr1, _attr2, _attr3);
+    uint256 tokenId = itemService.createItem(_owner, _founder, _creator, _isBitizenItem, _attr1, _attr2, _attr3);
     bytes8 itemHash = itemService.getItemHash(tokenId);
     _saveItemIndex(itemHash, tokenId);
     if(itemLimitedCount[itemHash] > 0){
       require(itemService.getSameItemCount(tokenId) <= itemLimitedCount[itemHash], "overflow");  // limited item
-      emit LimitedItemCreated(_owner, tokenId);
+      emit ItemCreated(_owner, tokenId, ItemRarity.RARITY_LIMITED);
     } else {
-      emit ItemCreated(_owner, tokenId);
+      emit ItemCreated(_owner, tokenId,  ItemRarity.RARITY_OTEHR);
     }
     return tokenId;
   }
 
-  function _saveItemIndex(bytes8 _itemHash, uint256 _tokenId) private {
+  function _saveItemIndex(bytes8 _itemHash, uint256 _itemId) private {
     itemIndex[_itemHash]++;
-    itemPosition[_tokenId] = itemIndex[_itemHash];
+    itemPosition[_itemId] = itemIndex[_itemHash];
   }
 
   function _setDefaultLimitedItem() private {

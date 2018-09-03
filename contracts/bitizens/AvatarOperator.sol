@@ -1,14 +1,14 @@
 pragma solidity ^0.4.24;
 
-import "../lib/Operator.sol";
+import "../lib/Ownable.sol";
 import "./AvatarService.sol";
 import "../lib/ERC721.sol";
-contract AvatarOperator is Operator {
+contract AvatarOperator is Ownable {
 
   // every user can own avatar count
   uint8 public PER_USER_MAX_AVATAR_COUNT = 1;
 
-  event AvatarCreateSuccess(address indexed _owner, uint256 tokenId);
+  event AvatarCreate(address indexed _owner, uint256 tokenId);
 
   AvatarService internal avatarService;
   address internal avatarAddress;
@@ -39,21 +39,31 @@ contract AvatarOperator is Operator {
   }
 
   function createAvatar(string _name, uint256 _dna) external nameValid(_name) returns (uint256 _tokenId){
-    require(ERC721(avatarAddress).balanceOf(msg.sender) < PER_USER_MAX_AVATAR_COUNT);
+    require(ERC721(avatarAddress).balanceOf(msg.sender) < PER_USER_MAX_AVATAR_COUNT, "overflow");
     _tokenId = avatarService.createAvatar(msg.sender, _name, _dna);
-    emit AvatarCreateSuccess(msg.sender, _tokenId);
+    emit AvatarCreate(msg.sender, _tokenId);
   }
 
-  function getMountTokenIds(uint256 _tokenId, address _avatarItemAddress) external view returns(uint256[]){
-    return avatarService.getMountTokenIds(msg.sender, _tokenId, _avatarItemAddress);
+  function getMountedChildren(uint256 _tokenId, address _avatarItemAddress) external view returns(uint256[]){
+    return avatarService.getMountedChildren(msg.sender, _tokenId, _avatarItemAddress);
   }
 
   function getAvatarInfo(uint256 _tokenId) external view returns (string _name, uint256 _dna) {
     return avatarService.getAvatarInfo(_tokenId);
   }
 
-  function getOwnedTokenIds() external view returns(uint256[] _tokenIds) {
-    return avatarService.getOwnedTokenIds(msg.sender);
+  function getOwnedAvatars() external view returns(uint256[] _tokenIds) {
+    return avatarService.getOwnedAvatars(msg.sender);
   }
-  
+
+  function handleChildren(
+    address _childContract, 
+    uint256[] _unmountChildren, // array of unmount child ids
+    uint256[] _mountChildren,   // array of mount child ids
+    uint256 _avatarId)           // above ids from which avatar 
+    external {
+    require(_childContract != address(0),"child address error");
+    avatarService.unmount(msg.sender, _childContract, _unmountChildren, _avatarId);
+    avatarService.mount(msg.sender, _childContract, _mountChildren, _avatarId);
+  }
 }

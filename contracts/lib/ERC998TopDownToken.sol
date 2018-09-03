@@ -5,10 +5,12 @@ import "./ERC721Metadata.sol";
 import "./SupportsInterfaceWithLookup.sol";
 import "./ComposableTopDown.sol";
 import "./SafeMath.sol";
-
+import "./UrlStr.sol";
 contract ERC998TopDownToken is SupportsInterfaceWithLookup, ERC721Enumerable, ERC721Metadata, ComposableTopDown {
-
+  using UrlStr for string;
   using SafeMath for uint256;
+
+  string internal BASE_URL = "https://www.mybitizen.com/00000000";
 
   bytes4 private constant InterfaceId_ERC721Enumerable = 0x780e9d63;
   /**
@@ -31,9 +33,6 @@ contract ERC998TopDownToken is SupportsInterfaceWithLookup, ERC721Enumerable, ER
   // Mapping from token id to position in the allTokens array
   mapping(uint256 => uint256) internal allTokensIndex;
 
-  // Optional mapping for token URIs
-  mapping(uint256 => string) internal tokenURIs;
-
   /**
    * @dev Constructor function
    */
@@ -41,13 +40,17 @@ contract ERC998TopDownToken is SupportsInterfaceWithLookup, ERC721Enumerable, ER
     // register the supported interfaces to conform to ERC721 via ERC165
     _registerInterface(InterfaceId_ERC721Enumerable);
     _registerInterface(InterfaceId_ERC721Metadata);
-    _registerInterface(InterfaceId_ERC998);
+    _registerInterface(bytes4(ERC998_MAGIC_VALUE));
   }
 
   modifier existsToken(uint256 _tokenId){
     address owner = tokenIdToTokenOwner[_tokenId];
     require(owner != address(0), "This tokenId is invalid"); 
     _;
+  }
+
+  function updateBaseURI(string _url) external onlyOwner {
+    BASE_URL = _url;
   }
 
   /**
@@ -72,7 +75,7 @@ contract ERC998TopDownToken is SupportsInterfaceWithLookup, ERC721Enumerable, ER
    * @param _tokenId uint256 ID of the token to query
    */
   function tokenURI(uint256 _tokenId) external view existsToken(_tokenId) returns (string) {
-    return "";
+    return BASE_URL.generateUrl(_tokenId);
   }
 
   /**
@@ -111,16 +114,6 @@ contract ERC998TopDownToken is SupportsInterfaceWithLookup, ERC721Enumerable, ER
   function tokenByIndex(uint256 _index) public view returns (uint256) {
     require(_index < totalSupply());
     return allTokens[_index];
-  }
-
-  /**
-   * @dev Internal function to set the token URI for a given token
-   * Reverts if the token ID does not exist
-   * @param _tokenId uint256 ID of the token to set its URI
-   * @param _uri string URI to assign
-   */
-  function _setTokenURI(uint256 _tokenId, string _uri) existsToken(_tokenId) internal {
-    tokenURIs[_tokenId] = _uri;
   }
 
   /**
@@ -170,8 +163,9 @@ contract ERC998TopDownToken is SupportsInterfaceWithLookup, ERC721Enumerable, ER
 
   //override
   //add Enumerable info
-  function _transfer(address _from, address _to, uint256 _tokenId) internal whenNotPaused {
-    super._transfer(_from, _to, _tokenId);
+  function _transferFrom(address _from, address _to, uint256 _tokenId) internal whenNotPaused {
+    // not allown to transfer when  only one  avatar
+    super._transferFrom(_from, _to, _tokenId);
     _addTokenTo(_to,_tokenId);
     _removeTokenFrom(_from, _tokenId);
   }

@@ -3,22 +3,22 @@ pragma solidity ^0.4.24;
 interface AvatarItemService {
 
   function getTransferTimes(uint256 _tokenId) external view returns(uint256);
-  function getOwnedTokenIds(address _owner) external view returns(uint256[] _tokenIds);
+  function getOwnedItems(address _owner) external view returns(uint256[] _tokenIds);
   
-  function getTokenInfo(uint256 _tokenId)
+  function getItemInfo(uint256 _tokenId)
     external 
     view 
     returns(string, string, bool, uint256[4] _attr1, uint8[5] _attr2, uint16[2] _attr3);
 
   function isBurned(uint256 _tokenId) external view returns (bool); 
   function isSameItem(uint256 _tokenId1, uint256 _tokenId2) external view returns (bool _isSame);
-  function getBurnedTokenCount() external view returns (uint256);
-  function getBurnedTokenIdByIndex(uint256 _index) external view returns (uint256);
+  function getBurnedItemCount() external view returns (uint256);
+  function getBurnedItemByIndex(uint256 _index) external view returns (uint256);
   function getSameItemCount(uint256 _tokenId) external view returns(uint256);
-  function getSameItemTokenIdByIndex(uint256 _tokenId, uint256 _index) external view returns(uint256);
+  function getSameItemIdByIndex(uint256 _tokenId, uint256 _index) external view returns(uint256);
   function getItemHash(uint256 _tokenId) external view returns (bytes8); 
 
-  function burnToken(address _owner, uint256 _tokenId) external;
+  function burnItem(address _owner, uint256 _tokenId) external;
   /**
     @param _owner         owner of the token
     @param _founder       founder type of the token 
@@ -29,7 +29,7 @@ interface AvatarItemService {
     @param _attr3         _atrr3[0] => miningTime  _atrr3[1] => magicFind     
     @return               token id
    */
-  function createToken( 
+  function createItem( 
     address _owner,
     string _founder,
     string _creator, 
@@ -40,7 +40,7 @@ interface AvatarItemService {
     external  
     returns(uint256 _tokenId);
 
-  function updateToken(
+  function updateItem(
     uint256 _tokenId,
     bool  _isBitizenItem,
     uint16 _miningTime,

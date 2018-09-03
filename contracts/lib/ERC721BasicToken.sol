@@ -7,7 +7,7 @@ import "./AddressUtils.sol";
 import "./SupportsInterfaceWithLookup.sol";
 import "./Pausable.sol";
 
-contract ERC721BasicToken is SupportsInterfaceWithLookup, ERC721, Pausable{
+contract ERC721BasicToken is SupportsInterfaceWithLookup, ERC721, Pausable {
 
   bytes4 public constant InterfaceId_ERC721 = 0x80ac58cd;
   /*

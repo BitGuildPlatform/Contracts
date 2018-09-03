@@ -1,10 +1,14 @@
 pragma solidity ^0.4.24;
 
 import "../lib/ERC721ExtendToken.sol";
-import "./AvatarChildService.sol";
 import "./AvatarItemService.sol";
+import "./AvatarChildService.sol";
 
 contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildService {
+
+  enum ItemHandleType{NULL, CREATE_ITEM, UPDATE_ITEM, BURN_ITEM}
+  
+  event ItemHandleEvent(address indexed _owner, uint256 indexed _itemId,ItemHandleType _type);
 
   struct AvatarItem {
     string foundedBy;     // item founder
@@ -22,33 +26,35 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     uint8 energy;         // increases extra mining times
     uint8 ext;            // extra attribute for future
   }
-
+  
   // item id index
-  uint256 internal tokenIndex = 0;
+  uint256 internal itemIndex = 0;
   // tokenId => item
-  mapping(uint256 => AvatarItem) internal tokenInfo;
+  mapping(uint256 => AvatarItem) internal avatarItems;
   // all the burned token ids
-  uint256[] internal burnedTokenIds;
+  uint256[] internal burnedItemIds;
   // check token id => isBurned
-  mapping(uint256 => bool) internal isBurnedToken;
-  //hash(item) => tokenIds
-  mapping(bytes8 => uint256[]) internal sameItemTokenIds;
+  mapping(uint256 => bool) internal isBurnedItem;
+  // hash(item) => tokenIds
+  mapping(bytes8 => uint256[]) internal sameItemIds;
+  // token id => index in the same item token ids array
+  mapping(uint256 => uint256) internal sameItemIdIndex;
   // token id => hash(item)
-  mapping(uint256 => bytes8) internal tokenIdToHash;
+  mapping(uint256 => bytes8) internal itemIdToHash;
   // item token id => transfer count
-  mapping(uint256 => uint256) itemTransferCount;
+  mapping(uint256 => uint256) internal itemTransferCount;
 
   // avatar address, add default permission to handle item
-  address public avatarAccount = 0xb891C4d89C1bF012F0014F56CE523F248A07F714;
+  address internal avatarAccount = this;
 
   // contain burned token and exist token 
-  modifier validToken(uint256 _tokenId) {
-    require(_tokenId > 0 && _tokenId <= tokenIndex, "token not vaild");
+  modifier validItem(uint256 _itemId) {
+    require(_itemId > 0 && _itemId <= itemIndex, "token not vaild");
     _;
   }
 
-  modifier tokenExists(uint256 _tokenId){
-    require(exists(_tokenId), "token error");
+  modifier itemExists(uint256 _itemId){
+    require(exists(_itemId), "token error");
     _;
   }
 
@@ -56,31 +62,35 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     avatarAccount = _account;
   }
 
-  function compareItemSlots(uint256 _tokenId1, uint256 _tokenId2)
+  function compareItemSlots(uint256 _itemId1, uint256 _itemId2)
     external
-    view 
-    tokenExists(_tokenId1)
-    tokenExists(_tokenId2)
+    view
+    itemExists(_itemId1)
+    itemExists(_itemId2)
     returns (bool) {
-    require(_tokenId1 != _tokenId2, "compared token shouldn't be the same");
-    return tokenInfo[_tokenId1].socket == tokenInfo[_tokenId2].socket;
+    require(_itemId1 != _itemId2, "compared token shouldn't be the same");
+    return avatarItems[_itemId1].socket == avatarItems[_itemId2].socket;
   }
 
-  function getTransferTimes(uint256 _tokenId) external view validToken(_tokenId) returns(uint256) {
-    return itemTransferCount[_tokenId];
+  function isAvatarChild(uint256 _itemId) external view returns(bool){
+    return true;
   }
 
-  function getOwnedTokenIds(address _owner) external view onlyOperator returns(uint256[] _tokenIds) {
+  function getTransferTimes(uint256 _itemId) external view validItem(_itemId) returns(uint256) {
+    return itemTransferCount[_itemId];
+  }
+
+  function getOwnedItems(address _owner) external view onlyOperator returns(uint256[] _items) {
     require(_owner != address(0), "address invalid");
     return ownedTokens[_owner];
   }
 
-  function getTokenInfo(uint256 _tokenId)
+  function getItemInfo(uint256 _itemId)
     external 
     view 
-    validToken(_tokenId)
+    validItem(_itemId)
     returns(string, string, bool, uint256[4] _attr1, uint8[5] _attr2, uint16[2] _attr3) {
-    AvatarItem storage item = tokenInfo[_tokenId];
+    AvatarItem storage item = avatarItems[_itemId];
     _attr1[0] = item.node;
     _attr1[1] = item.listNumber;
     _attr1[2] = item.setNumber;
@@ -95,52 +105,52 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     return (item.foundedBy, item.createdBy, item.isBitizenItem, _attr1, _attr2, _attr3);
   }
 
-  function isBurned(uint256 _tokenId) external view validToken(_tokenId) returns (bool) {
-    return isBurnedToken[_tokenId];
+  function isBurned(uint256 _itemId) external view validItem(_itemId) returns (bool) {
+    return isBurnedItem[_itemId];
   }
 
-  function getBurnedTokenCount() external view returns (uint256) {
-    return burnedTokenIds.length;
+  function getBurnedItemCount() external view returns (uint256) {
+    return burnedItemIds.length;
   }
 
-  function getBurnedTokenIdByIndex(uint256 _index) external view returns (uint256) {
-    require(_index < burnedTokenIds.length, "out of boundary");
-    return burnedTokenIds[_index];
+  function getBurnedItemByIndex(uint256 _index) external view returns (uint256) {
+    require(_index < burnedItemIds.length, "out of boundary");
+    return burnedItemIds[_index];
   }
 
-  function getSameItemCount(uint256 _tokenId) external view validToken(_tokenId) returns(uint256) {
-    return sameItemTokenIds[tokenIdToHash[_tokenId]].length;
+  function getSameItemCount(uint256 _itemId) external view validItem(_itemId) returns(uint256) {
+    return sameItemIds[itemIdToHash[_itemId]].length;
   }
   
-  function getSameItemTokenIdByIndex(uint256 _tokenId, uint256 _index) external view validToken(_tokenId) returns(uint256) {
-    bytes8 itemHash = tokenIdToHash[_tokenId];
-    uint256[] storage tokenIds = sameItemTokenIds[itemHash];
-    require(_index < tokenIds.length, "out of boundray");
-    return tokenIds[_index];
+  function getSameItemIdByIndex(uint256 _itemId, uint256 _index) external view validItem(_itemId) returns(uint256) {
+    bytes8 itemHash = itemIdToHash[_itemId];
+    uint256[] storage items = sameItemIds[itemHash];
+    require(_index < items.length, "out of boundray");
+    return items[_index];
   }
 
-  function getItemHash(uint256 _tokenId) external view validToken(_tokenId) returns (bytes8) {
-    return tokenIdToHash[_tokenId];
+  function getItemHash(uint256 _itemId) external view validItem(_itemId) returns (bytes8) {
+    return itemIdToHash[_itemId];
   }
 
-  function isSameItem(uint256 _tokenId1, uint256 _tokenId2)
+  function isSameItem(uint256 _itemId1, uint256 _itemId2)
     external
     view
-    validToken(_tokenId1)
-    validToken(_tokenId2)
+    validItem(_itemId1)
+    validItem(_itemId2)
     returns (bool _isSame) {
-    if(_tokenId1 == _tokenId2) {
+    if(_itemId1 == _itemId2) {
       _isSame = true;
     } else {
-      _isSame = _calcuItemHash(_tokenId1) == _calcuItemHash(_tokenId2);
+      _isSame = _calcuItemHash(_itemId1) == _calcuItemHash(_itemId2);
     }
   }
 
-  function burnToken(address _owner, uint256 _tokenId) external onlyOperator tokenExists(_tokenId) {
-    _burnToken(_owner, _tokenId);
+  function burnItem(address _owner, uint256 _itemId) external onlyOperator itemExists(_itemId) {
+    _burnItem(_owner, _itemId);
   }
 
-  function createToken( 
+  function createItem( 
     address _owner,
     string _founder,
     string _creator, 
@@ -150,17 +160,18 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     uint16[2] _attr3)
     external  
     onlyOperator
-    returns(uint256 _tokenId) {
+    returns(uint256 _itemId) {
     require(_owner != address(0), "address invalid");
-    AvatarItem memory item = _mintToken(_founder, _creator, _isBitizenItem, _attr1, _attr2, _attr3);
-    _tokenId = ++tokenIndex;
-    tokenInfo[_tokenId] = item;
-    _mint(_owner, _tokenId);
-    _saveItemHash(_tokenId);
+    AvatarItem memory item = _mintItem(_founder, _creator, _isBitizenItem, _attr1, _attr2, _attr3);
+    _itemId = ++itemIndex;
+    avatarItems[_itemId] = item;
+    _mint(_owner, _itemId);
+    _saveItemHash(_itemId);
+    emit ItemHandleEvent(_owner, _itemId, ItemHandleType.CREATE_ITEM);
   }
 
-  function updateToken(
-    uint256 _tokenId,
+  function updateItem(
+    uint256 _itemId,
     bool  _isBitizenItem,
     uint16 _miningTime,
     uint16 _magicFind,
@@ -176,34 +187,30 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
   ) 
   external 
   onlyOperator
-  tokenExists(_tokenId){
-    require(_deleteOldValue(_tokenId)); // this checking should be always through
-    _updateToken(_tokenId,_isBitizenItem,_miningTime,_magicFind,_node,_listNumber,_setNumber,_quality,_rarity,_socket,_gender,_energy,_ext);
-    _saveItemHash(_tokenId);
+  itemExists(_itemId){
+    _deleteOldValue(_itemId); 
+    _updateItem(_itemId,_isBitizenItem,_miningTime,_magicFind,_node,_listNumber,_setNumber,_quality,_rarity,_socket,_gender,_energy,_ext);
+    _saveItemHash(_itemId);
   }
 
-  function _deleteOldValue(uint256 _tokenId) private returns(bool) {
-    uint256[] storage tokenIds = sameItemTokenIds[tokenIdToHash[_tokenId]];
-    uint256 lastTokenId = tokenIds[tokenIds.length - 1];
+  function _deleteOldValue(uint256 _itemId) private {
+    uint256[] storage tokenIds = sameItemIds[itemIdToHash[_itemId]];
     require(tokenIds.length > 0);
-    for(uint256 i = 0; i < tokenIds.length; i++) {
-      if(tokenIds[i] == _tokenId) { // there must be a token id make it true
-        tokenIds[i] = lastTokenId;
-        tokenIds.length--;
-        return true;
-      }
-    }
-    return false;
+    uint256 lastTokenId = tokenIds[tokenIds.length - 1];
+    tokenIds[sameItemIdIndex[_itemId]] = lastTokenId;
+    sameItemIdIndex[lastTokenId] = sameItemIdIndex[_itemId];
+    tokenIds.length--;
   }
 
-  function _saveItemHash(uint256 _tokenId) private {
-    bytes8 itemHash = _calcuItemHash(_tokenId);
-    sameItemTokenIds[itemHash].push(_tokenId);
-    tokenIdToHash[_tokenId] = itemHash;
+  function _saveItemHash(uint256 _itemId) private {
+    bytes8 itemHash = _calcuItemHash(_itemId);
+    uint256 index = sameItemIds[itemHash].push(_itemId);
+    sameItemIdIndex[_itemId] = index - 1;
+    itemIdToHash[_itemId] = itemHash;
   }
     
-  function _calcuItemHash(uint256 _tokenId) private view returns (bytes8) {
-    AvatarItem storage item = tokenInfo[_tokenId];
+  function _calcuItemHash(uint256 _itemId) private view returns (bytes8) {
+    AvatarItem storage item = avatarItems[_itemId];
     bytes memory itemBytes = abi.encodePacked(
       item.isBitizenItem,
       item.miningTime,
@@ -221,7 +228,7 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     return bytes8(keccak256(itemBytes));
   }
 
-  function _mintToken(  
+  function _mintItem(  
     string _foundedBy,
     string _createdBy, 
     bool _isBitizenItem, 
@@ -249,8 +256,8 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     );
   }
 
-  function _updateToken(
-    uint256 _tokenId,
+  function _updateItem(
+    uint256 _itemId,
     bool  _isBitizenItem,
     uint16 _miningTime,
     uint16 _magicFind,
@@ -264,7 +271,7 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     uint8 _energy,
     uint8 _ext
   ) private {
-    AvatarItem storage item = tokenInfo[_tokenId];
+    AvatarItem storage item = avatarItems[_itemId];
     item.isBitizenItem = _isBitizenItem;
     item.miningTime = _miningTime;
     item.magicFind = _magicFind;
@@ -277,28 +284,28 @@ contract AvatarItemToken is ERC721ExtendToken, AvatarItemService, AvatarChildSer
     item.gender = _gender;  
     item.energy = _energy; 
     item.ext = _ext; 
+    emit ItemHandleEvent(_ownerOf(_itemId), _itemId, ItemHandleType.UPDATE_ITEM);
   }
 
-  //Only the token owner have the permission to burn token
-  function _burnToken(address _owner, uint256 _tokenId) private {
-    require(_owner == _ownerOf(_tokenId), "no permission");
-    burnedTokenIds.push(_tokenId);
-    isBurnedToken[_tokenId] = true;
-    _burn(_owner, _tokenId);
+  function _burnItem(address _owner, uint256 _itemId) private {
+    burnedItemIds.push(_itemId);
+    isBurnedItem[_itemId] = true;
+    _burn(_owner, _itemId);
+    emit ItemHandleEvent(_owner, _itemId, ItemHandleType.BURN_ITEM);
   }
 
   // override 
   //Add default permission to avatar, user can change this permission by call setApprovalForAll
-  function _mint(address _to, uint256 _tokenId) internal {
-    super._mint(_to, _tokenId);
+  function _mint(address _to, uint256 _itemId) internal {
+    super._mint(_to, _itemId);
     operatorApprovals[_to][avatarAccount] = true;
   }
 
   // override
   // record every token transfer count
-  function _transfer(address _from, address _to, uint256 _tokenId) internal {
-    super._transfer(_from, _to, _tokenId);
-    itemTransferCount[_tokenId]++;
+  function _transfer(address _from, address _to, uint256 _itemId) internal {
+    super._transfer(_from, _to, _itemId);
+    itemTransferCount[_itemId]++;
   }
 
   function () public payable {
