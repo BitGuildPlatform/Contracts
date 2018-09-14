@@ -19,6 +19,17 @@ contract Pausable is Operator {
     _;  
   }
 
+  modifier whenNotFreeze(address _target) {
+    require(_target != address(0));
+    require(!frozenAccount[_target]);
+    _;
+  }
+
+  function isFrozen(address _target) external view returns (bool) {
+    require(_target != address(0));
+    return frozenAccount[_target];
+  }
+
   function doPause() external  whenNotPaused onlyOwner {
     isPaused = true;
   }
@@ -27,9 +38,10 @@ contract Pausable is Operator {
     isPaused = false;
   }
 
-  function freezeAccount(address target, bool freeze) public onlyOwner {
-    frozenAccount[target] = freeze;
-    emit FrozenFunds(target, freeze);
+  function freezeAccount(address _target, bool _freeze) public onlyOwner {
+    require(_target != address(0));
+    frozenAccount[_target] = _freeze;
+    emit FrozenFunds(_target, _freeze);
   }
 
 }
